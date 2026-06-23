@@ -38,7 +38,7 @@
     { id: 'USE',  label: 'USE',  icon: 'HOME', kind: 'use',     color: COLORS.consumption, max: MAX.USE },
     { id: 'SOL',  label: 'SOL',  icon: 'SUN',  kind: 'power',   color: COLORS.solar, max: MAX.SOL, sample: 3284 },
     { id: 'SELF', label: 'SELF', icon: 'SELF', kind: 'self',    color: COLORS.self,  max: MAX.SELF },
-    { id: 'GRID', label: 'GRID', icon: 'GRID_TOWER', kind: 'grid', maxPos: MAX.GRID_IMPORT, maxNeg: MAX.GRID_EXPORT, sample: -2761 },
+    { id: 'GRID', label: 'GRID', icon: 'GRID', kind: 'grid', maxPos: MAX.GRID_IMPORT, maxNeg: MAX.GRID_EXPORT, sample: -2761 },
     { id: 'HW1',  label: 'HW1',  icon: 'BATT', kind: 'soc',      sample: 78 },
     { id: 'HW1P', label: 'HW1',  icon: 'BOLT', kind: 'batpower', max: MAX.HW_POWER,  sample: 250 },
     { id: 'HW2',  label: 'HW2',  icon: 'BATT', kind: 'soc',      sample: 64 },

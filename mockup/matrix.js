@@ -2,21 +2,15 @@
 (function (global) {
   const W = 32, H = 8, OFF = '#141414';
 
-  // Icons are 8 wide x 5 tall — the same height as the 3x5 value font, drawn on
-  // rows 1-5 beside the value. Row 7 is left for the gauge bar.
+  // Icons are 8 wide x 5 tall — the same height as the 3x5 value font, drawn
+  // beside the value. Row 7 is left for the gauge bar.
   const ICONS = {
-    SUN:  [" # ## # ","  ####  ","########","  ####  "," # ## # "],
-    HOME: ["   ##   ","  ####  "," ###### "," #    # "," # ## # "],
-    SELF: ["   ##   ","  ####  "," ###### "," ###### "," ###### "],
-    GRID: ["   ##   "," ###### ","   ##   "," ###### ","   ##   "],
-    BATT: ["#####   ","#   #   ","#   ##  ","#   #   ","#####   "],
-    BOLT: ["    ### ","   ##   ","  ####  ","    ##  ","  ##    "],
-
-    // ---- alternatives for comparison ----
-    GRID_TOWER: ["   ##   "," ###### ","  #  #  "," ###### ","#      #"],
-    SELF_CORE:  ["   ##   ","  ####  "," ###### "," # ## # "," #    # "],
-    SELF_LOOP:  ["  ####  "," #    # "," #    # "," #    # ","  ####  "],
-    SELF_IN:    ["   ##   ","########"," #    # "," #    # "," #    # "]
+    SUN:  [" # ## # ","  ####  ","########","  ####  "," # ## # "],   // SOL
+    HOME: ["   ##   ","  ####  "," ###### "," #    # "," # ## # "],   // USE
+    SELF: ["   ##   ","  ####  "," ###### "," ###### "," ###### "],   // self-use (solid house)
+    GRID: ["   ##   "," ###### ","  #  #  "," ###### ","#      #"],   // grid (transmission tower)
+    BATT: ["#####   ","#   #   ","#   ##  ","#   #   ","#####   "],   // SOC
+    BOLT: ["   ###  ","  ##    "," #####  ","    ##  ","   ##   "]    // battery power
   };
 
   class Matrix {

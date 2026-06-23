@@ -1,0 +1,1 @@
+{"name":"HA Energy","description":"Live Home Assistant energy display on the LED matrix: consumption, solar, self-use, grid and home-battery SOC/power. Three modes (Rotate/Ticker/Gauge) on UP/DOWN, stats on LEFT/RIGHT, B to exit.","category":"system","author":"Arie","revision":1}
