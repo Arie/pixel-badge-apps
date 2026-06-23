@@ -57,4 +57,7 @@
   });
   matrixEl.focus();
   render();
+
+  // Blink phase for overflow gauges; re-render while in Gauge mode.
+  setInterval(() => { window.Blink.on = !window.Blink.on; if (MODES[mode] === 'Gauge') renderGauge(); }, 450);
 })();

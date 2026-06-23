@@ -7,9 +7,9 @@
     solar:       '#33d96f', // green
     export:      '#33d96f', // green (back to grid)
     self:        '#4fc3ff', // light blue
-    charge:      '#33d96f', // battery charging (power in)
-    discharge:   '#ff9d3a', // battery discharging (power out)
-    overflow:    '#ffffff', // value above its rated maximum
+    charge:      '#7b3ff2', // battery charging = drawing power (like consumption) → purple
+    discharge:   '#33d96f', // battery discharging = supplying power (like export) → green
+    alert:       '#ff2a2a', // blinking-red overflow above rated maximum
     socHigh:     '#33d96f', socMid: '#ff9d3a', socLow: '#ff4d4d'
   };
 
@@ -18,7 +18,8 @@
     USE:  17250, // home grid connection rated power; > this = solar+battery boost
     SOL:  6000,  // solar inverter rated power
     SELF: 6000,  // bounded by solar
-    GRID: 17250, // grid connection rating (assumption — confirm)
+    GRID_IMPORT: 17250, // grid connection rating (import side)
+    GRID_EXPORT: 6000,  // solar inverter max; > this = batteries boosting export → overflow
     HW_POWER:  800,  // HomeWizard plug-in battery, each way
     ZEN_POWER: 2400, // Zendure AC2400+, each way
     SOC: 100
@@ -37,7 +38,7 @@
     { id: 'USE',  label: 'USE',  icon: 'HOME', kind: 'use',     color: COLORS.consumption, max: MAX.USE },
     { id: 'SOL',  label: 'SOL',  icon: 'SUN',  kind: 'power',   color: COLORS.solar, max: MAX.SOL, sample: 3284 },
     { id: 'SELF', label: 'SELF', icon: 'SELF', kind: 'self',    color: COLORS.self,  max: MAX.SELF },
-    { id: 'GRID', label: 'GRID', icon: 'GRID', kind: 'grid',    max: MAX.GRID, sample: -2761 },
+    { id: 'GRID', label: 'GRID', icon: 'GRID_TOWER', kind: 'grid', maxPos: MAX.GRID_IMPORT, maxNeg: MAX.GRID_EXPORT, sample: -2761 },
     { id: 'HW1',  label: 'HW1',  icon: 'BATT', kind: 'soc',      sample: 78 },
     { id: 'HW1P', label: 'HW1',  icon: 'BOLT', kind: 'batpower', max: MAX.HW_POWER,  sample: 250 },
     { id: 'HW2',  label: 'HW2',  icon: 'BATT', kind: 'soc',      sample: 64 },
@@ -66,7 +67,9 @@
   function fmt(stat, v) {
     if (stat.kind === 'soc') return v + '%';
     const a = Math.abs(v), sign = isSigned(stat) ? (v < 0 ? '-' : '+') : '';
-    return a >= 1000 ? sign + (a / 1000).toFixed(1) + 'K' : sign + a + 'W';
+    if (a < 1000) return sign + a + 'W';
+    const k = a / 1000;                              // drop the decimal at >=10kW to fit
+    return sign + (k >= 10 ? Math.round(k) : k.toFixed(1)) + 'KW';
   }
 
   global.EnergyConfig = { COLORS, MAX, MODES, STATS, value, colorOf, isSigned, isBidir, fmt };

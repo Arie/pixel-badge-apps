@@ -61,29 +61,52 @@ template sensors):**
 
 ## 5. Colors (HomeWizard-inspired, brightened for LEDs)
 
-| Role                         | Hex       |
-|------------------------------|-----------|
-| Consumption / grid import    | `#7b3ff2` purple |
-| Solar / grid export / charging | `#33d96f` green |
-| Self-use                     | `#4fc3ff` light blue |
-| Battery discharging          | `#ff9d3a` amber |
-| Overflow (value > rated max) | `#ffffff` white |
-| Battery SOC ≥50 / 20–50 / <20 % | green / amber / red |
+| Role                              | Hex       |
+|-----------------------------------|-----------|
+| Consumption / grid import / **battery charging** | `#7b3ff2` purple |
+| Solar / grid export / **battery discharging**    | `#33d96f` green |
+| Self-use                          | `#4fc3ff` light blue |
+| Overflow (value > rated max)      | `#ff2a2a` red, **blinking** (~450 ms) |
+| Battery SOC ≥50 / 20–50 / <20 %   | green `#33d96f` / amber `#ff9d3a` / red `#ff4d4d` |
+
+Rationale: a battery **charging** draws power like a load → purple (consumption);
+**discharging** supplies power like solar/export → green. No amber for battery
+power (amber is SOC-mid only).
 
 ## 6. Gauges & maxima (constants)
 
-Gauge mode draws a bottom bar scaled to a per-stat full-scale maximum.
+Gauge mode draws a **full-width bar on the bottom row (row 7)**, scaled to a
+per-stat full-scale maximum. The **anchor side encodes sign**: positive
+(consume/import/charge) grows from the **left edge**, negative (export/discharge)
+grows from the **right edge**. Above the max the **whole bar blinks red**.
 
-| Stat            | Max (full-scale) | Bar style |
-|-----------------|------------------|-----------|
-| `USE`           | **17 250 W** (grid connection rating) | left→right; **>max ⇒ white overflow tip** (solar+battery boosting beyond the connection) |
-| `SOL` / `SELF`  | **6 000 W** (solar inverter)          | left→right |
-| `GRID`          | **17 250 W**                          | bidirectional centre-out: export ← / import → |
-| `HW1`/`HW2` power | **±800 W** each way                 | bidirectional: charge → / discharge ← |
-| `ZEN` power     | **±2 400 W** each way                 | bidirectional |
-| any `soc`       | 100 %                                 | left→right, colour by level |
+| Stat            | Full-scale max | Anchor / overflow |
+|-----------------|----------------|-------------------|
+| `USE`           | **17 250 W** (connection rating) | left; **>max → blinking red** (solar+battery boosting past the connection) |
+| `SOL` / `SELF`  | **6 000 W** (solar inverter)     | left |
+| `GRID`          | **import 17 250 W / export 6 000 W** (asymmetric) | import → left, export → right; **export >6 kW → blinking red** (batteries discharging to grid on top of solar) |
+| `HW1`/`HW2` power | **±800 W**  | charge → left, discharge → right |
+| `ZEN` power     | **±2 400 W** | charge → left, discharge → right |
+| any `soc`       | 100 %        | left, colour by level |
 
-`GRID` max is assumed equal to the connection rating (17 250 W) — confirm.
+## 6b. Rendering & layout spec (32×8)
+
+So the real-display app reproduces the mockup exactly:
+
+- **Panel:** 32×8. In the mockup, LEDs are drawn as separated round dots with
+  dark gaps (cosmetic only — the device just lights pixels).
+- **Font:** custom **3×5** pixel font (`pixelfont.js`), 1 px gap → 4 px/char.
+- **Icons:** **8 wide × 5 tall** (`matrix.js` `ICONS`), cols 0–7, so they match
+  the value text height. Chosen icons: `SUN`(SOL), `HOME`(USE), solid-house
+  `SELF`, `GRID_TOWER`(GRID, transmission tower), `BATT`(SOC), `BOLT`(battery power).
+- **Per-stat row layout:** icon at cols 0–7; value text at **x = 9**.
+  - **Non-gauge** (Rotate/Ticker): icon + value **vertically centred** (rows 1–5).
+  - **Gauge:** icon + value **top-aligned** (rows 0–4); blank rows 5–6; **bar on row 7**.
+- **Value formatting:** `<1000` → `"<n>W"`; `≥1000` → `"<x.x>KW"`, dropping the
+  decimal at ≥10 kW (`"17KW"`); `soc` → `"<n>%"`; signed stats (`grid`,`batpower`)
+  prefix `+`/`−`. Max width is 6 chars (e.g. `-2.8KW`), which fits from x=9.
+- **Bars:** full 32-px width from the anchored edge; `length = |value| / max`
+  (SOC: `value/100`); overflow → entire row blinks red at ~450 ms.
 
 ## 7. Display modes (UP/DOWN)
 
@@ -116,18 +139,25 @@ apps/ha_energy/                  # on-badge
 
 pixel-badge-apps/                # this repo (local git)
   docs/2026-06-23-ha-energy-app-design.md
-  mockup/  pixelfont.js matrix.js stats.js sim.js sim.css energy-sim.html
+  mockup/  pixelfont.js matrix.js stats.js render.js sim.js sim.css
+           energy-sim.html  gallery.html gallery.js
   app/     # the MicroPython app
 ```
 
-The mockup mirrors the device split: framebuffer + font/icon renderer
-(`pixelfont`/`matrix`), config/maxima/derivation (`stats`), controller (`sim`).
-`stats.js` is the single source of truth and tracks the on-device config.
+The mockup mirrors the device split: font/icon renderer (`pixelfont`/`matrix`),
+config/maxima/derivation (`stats`), shared stat renderer (`render`), and a
+controller (`sim`). `gallery.html` is a contact sheet of every icon + stat,
+driven with Playwright for visual review. `stats.js` is the single source of
+truth and tracks the on-device config. Served by any static server
+(`python3 -m http.server`, relative asset paths).
 
 ## 12. Open questions / to provide
 
-- Confirm **`batpower` sign** (charge vs discharge) once a battery is active.
-- Confirm **`GRID` gauge max** (assumed 17 250 W).
+- **SELF icon** — pick one: solid house (current), outline+core, loop/contained,
+  or energy-in arrow (see gallery "SELF options").
+- Confirm **`batpower` sign** (charge=+, discharge=−) once a battery is active.
 - Default **mode** on launch (proposed Rotate) and **brightness** (proposed 10/30).
-- Whether 10 stats is the right granularity, or batteries should be composite
-  (SOC + power on one screen).
+
+**Resolved:** derive USE/SELF on-badge · 10 separate stats (SOC + power per
+battery) · GRID export max 6 kW with battery-boost overflow · charge=purple /
+discharge=green · overflow = blinking red · gauges anchored by sign.

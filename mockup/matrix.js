@@ -2,14 +2,21 @@
 (function (global) {
   const W = 32, H = 8, OFF = '#141414';
 
-  // Icons are 8 wide x 7 tall: row 7 is ALWAYS blank so the gauge bar owns it.
+  // Icons are 8 wide x 5 tall — the same height as the 3x5 value font, drawn on
+  // rows 1-5 beside the value. Row 7 is left for the gauge bar.
   const ICONS = {
-    SUN:  ["#  ##  #"," # ## # ","  ####  "," ###### ","  ####  "," # ## # ","#  ##  #","        "],
-    HOME: ["   ##   ","  ####  "," ###### ","########"," #    # "," #  # # "," #  # # ","        "],
-    SELF: ["   ##   ","  ####  "," ###### ","########"," ###### "," ###### "," ###### ","        "],
-    GRID: ["   ##   ","  ####  "," ###### ","   ##   "," ###### ","  ####  ","   ##   ","        "],
-    BATT: ["        ","######  ","#    #  ","#    ###","#    ###","#    #  ","######  ","        "],
-    BOLT: ["    ##  ","   ##   ","  ###   "," #####  ","   ##   ","  ##    "," #      ","        "]
+    SUN:  [" # ## # ","  ####  ","########","  ####  "," # ## # "],
+    HOME: ["   ##   ","  ####  "," ###### "," #    # "," # ## # "],
+    SELF: ["   ##   ","  ####  "," ###### "," ###### "," ###### "],
+    GRID: ["   ##   "," ###### ","   ##   "," ###### ","   ##   "],
+    BATT: ["#####   ","#   #   ","#   ##  ","#   #   ","#####   "],
+    BOLT: ["    ### ","   ##   ","  ####  ","    ##  ","  ##    "],
+
+    // ---- alternatives for comparison ----
+    GRID_TOWER: ["   ##   "," ###### ","  #  #  "," ###### ","#      #"],
+    SELF_CORE:  ["   ##   ","  ####  "," ###### "," # ## # "," #    # "],
+    SELF_LOOP:  ["  ####  "," #    # "," #    # "," #    # ","  ####  "],
+    SELF_IN:    ["   ##   ","########"," #    # "," #    # "," #    # "]
   };
 
   class Matrix {
@@ -18,6 +25,10 @@
       el.style.display = 'grid';
       el.style.gridTemplateColumns = `repeat(${W},1fr)`;
       el.style.gridTemplateRows = `repeat(${H},1fr)`;
+      el.style.gap = '2px';                 // dark space between LEDs (real panel)
+      el.style.background = '#050505';
+      el.style.padding = '6px';
+      el.style.borderRadius = '6px';
       this.cells = [];
       for (let i = 0; i < W * H; i++) {
         const d = document.createElement('div');
@@ -38,19 +49,16 @@
     bar(buf, x, y, len, color) {
       for (let i = 0; i < len; i++) window.PixelFont.setPixel(buf, x + i, y, color);
     }
-    // Unidirectional bar from the left; fills `frac` (0..1) of the 30px track.
-    // Returns true if frac>1 (overflow).
+    // Full-width bar (all 32 columns) anchored at the LEFT edge (x0), growing right.
     barLeft(buf, y, frac, color) {
-      const n = Math.min(30, Math.round(frac * 30));
-      for (let i = 0; i < n; i++) window.PixelFont.setPixel(buf, 1 + i, y, color);
-      return frac > 1;
+      const n = Math.min(W, Math.round(Math.min(1, frac) * W));
+      for (let i = 0; i < n; i++) window.PixelFont.setPixel(buf, i, y, color);
     }
-    // Bidirectional bar growing from the centre. dir>0 to the right, dir<0 left.
-    barCenter(buf, y, frac, dir, color) {
-      const n = Math.round(Math.min(1, frac) * 15);
-      window.PixelFont.setPixel(buf, dir >= 0 ? 16 : 15, y, color); // centre seed
-      for (let i = 1; i <= n; i++)
-        window.PixelFont.setPixel(buf, dir >= 0 ? 16 + i : 15 - i, y, color);
+    // Full-width bar anchored at the RIGHT edge (x31), growing left. Used for
+    // negative (discharge/export) values so the anchor side encodes direction.
+    barRight(buf, y, frac, color) {
+      const n = Math.min(W, Math.round(Math.min(1, frac) * W));
+      for (let i = 0; i < n; i++) window.PixelFont.setPixel(buf, W - 1 - i, y, color);
     }
     paint(buf) {
       for (let y = 0; y < H; y++)

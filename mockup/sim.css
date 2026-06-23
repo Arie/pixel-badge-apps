@@ -1,5 +1,5 @@
 /* sim.css — styling for the 32x8 energy-display mockup. */
-:root { --bg:#0f1115; --fg:#dfe7ef; --muted:#8a97a6; --panel:#0a0a0a; --off:#141414; }
+:root { --bg:#0f1115; --fg:#dfe7ef; --muted:#8a97a6; --panel:#050505; --off:#141414; }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 28px; background: var(--bg); color: var(--fg);
        font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
@@ -8,9 +8,10 @@ h1 { font-size: 18px; margin: 0 0 4px; }
 .subtitle b { color: var(--fg); }
 
 .sim { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
-#matrix { gap: 1px; background: var(--panel); padding: 7px; border-radius: 7px;
+/* Render LEDs as separated round dots with dark gaps, like the real panel. */
+#matrix { gap: 2px; background: var(--panel); padding: 8px; border-radius: 7px;
           border: 1px solid #222; width: 480px; height: 138px; outline: none; }
-.cell { background: var(--off); border-radius: 1px; }
+.cell { background: var(--off); border-radius: 50%; }
 
 .modes { display: flex; gap: 6px; margin-top: 10px; }
 .pill { font-size: 12px; padding: 3px 8px; border-radius: 10px; background: #1a1d23;
