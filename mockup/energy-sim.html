@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixel Energy — 32x8 mockup</title>
+  <link rel="stylesheet" href="/files/sim.css">
+</head>
+<body>
+  <h1>Pixel badge · HA energy display — interactive mockup</h1>
+  <p class="subtitle">
+    UP/DOWN = mode · LEFT/RIGHT = stat. Click the matrix, then use the arrow keys (or the D-pad).
+    Short stat tags: <b>USE · SOL · SELF · GRID · HW1 · HW2 · ZEN</b>.
+  </p>
+
+  <div class="sim">
+    <div>
+      <div id="matrix" tabindex="0"></div>
+      <div class="modes" id="modepills"></div>
+      <div class="readout" id="readout"></div>
+      <div class="legend">
+        <span class="sw" style="background:#7b3ff2"></span>consumption
+        <span class="sw" style="background:#33d96f"></span>solar / export
+        <span class="sw" style="background:#4fc3ff"></span>self-use
+        <span class="sw" style="background:#ff9d3a"></span>battery (by SOC)
+      </div>
+    </div>
+    <div>
+      <div class="dpad">
+        <div class="sp"></div><button data-k="up">▲</button><div class="sp"></div>
+        <button data-k="left">◀</button><div class="sp"></div><button data-k="right">▶</button>
+        <div class="sp"></div><button data-k="down">▼</button><div class="sp"></div>
+      </div>
+      <p class="readout" style="max-width:230px">▲▼ change <b>mode</b><br>◀▶ change <b>stat</b><br><br>Sample data — real values come from Home Assistant.</p>
+    </div>
+  </div>
+
+  <script src="/files/pixelfont.js"></script>
+  <script src="/files/matrix.js"></script>
+  <script src="/files/stats.js"></script>
+  <script src="/files/sim.js"></script>
+</body>
+</html>

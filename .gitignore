@@ -1,0 +1,9 @@
+# Home Assistant secrets — never commit
+app/config.json
+**/config.json
+
+# Brainstorm/visual-companion scratch
+.superpowers/
+
+# HA token
+.ha-token

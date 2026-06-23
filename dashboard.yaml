@@ -1,0 +1,388 @@
+views:
+  - title: Energy & Batteries
+    path: energy
+    icon: mdi:home-battery
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Live Power
+            icon: mdi:transmission-tower
+          - type: tile
+            entity: sensor.homewizard_p1_vermogen
+            name: P1 (grid)
+            icon: mdi:transmission-tower
+          - type: tile
+            entity: sensor.solaredge_se6k_ac_power
+            name: Solar
+            icon: mdi:solar-power
+            color: yellow
+          - type: tile
+            entity: sensor.zendure_signed_power
+            name: Zendure (+ charge / - discharge)
+            icon: mdi:home-battery
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.plug_in_battery_power
+                name: PIB 1
+                icon: mdi:battery-charging
+              - type: tile
+                entity: sensor.plug_in_battery_power_2
+                name: PIB 2
+                icon: mdi:battery-charging
+          - type: tile
+            entity: sensor.peblar_ev_charger_power
+            name: Peblar charger
+            icon: mdi:ev-station
+            color: cyan
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.itho_wpu_status
+                name: Heat pump
+                icon: mdi:heat-pump
+              - type: tile
+                entity: binary_sensor.itho_wpu_compressor
+                name: Compressor
+                icon: mdi:engine
+              - type: tile
+                entity: sensor.wpu_power_from_source
+                name: Source flow
+                icon: mdi:thermometer-water
+      - type: grid
+        cards:
+          - type: heading
+            heading: State of Charge
+            icon: mdi:battery
+          - type: gauge
+            entity: sensor.zendure_2400_ac_laadpercentage
+            name: Zendure
+            min: 0
+            max: 100
+            needle: true
+            severity:
+              green: 60
+              yellow: 30
+              red: 0
+          - type: horizontal-stack
+            cards:
+              - type: gauge
+                entity: sensor.plug_in_battery_state_of_charge
+                name: PIB 1
+                min: 0
+                max: 100
+                needle: true
+                severity:
+                  green: 60
+                  yellow: 30
+                  red: 0
+              - type: gauge
+                entity: sensor.plug_in_battery_state_of_charge_2
+                name: PIB 2
+                min: 0
+                max: 100
+                needle: true
+                severity:
+                  green: 60
+                  yellow: 30
+                  red: 0
+          - type: history-graph
+            title: SOC — 24h
+            hours_to_show: 24
+            refresh_interval: 60
+            entities:
+              - entity: sensor.zendure_2400_ac_laadpercentage
+                name: Zendure
+              - entity: sensor.plug_in_battery_state_of_charge
+                name: PIB 1
+              - entity: sensor.plug_in_battery_state_of_charge_2
+                name: PIB 2
+              - entity: sensor.z003fz_battery
+                name: Renault
+      - type: grid
+        cards:
+          - type: heading
+            heading: EV & Charging
+            icon: mdi:ev-station
+          - type: gauge
+            entity: sensor.z003fz_battery
+            name: Renault SOC
+            min: 0
+            max: 100
+            needle: true
+            severity:
+              green: 60
+              yellow: 30
+              red: 0
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.peblar_ev_charger_state
+                name: Peblar
+                icon: mdi:ev-station
+              - type: tile
+                entity: sensor.z003fz_charge_state
+                name: Renault
+                icon: mdi:car-electric
+          - type: tile
+            entity: sensor.peblar_ev_charger_power
+            name: Charge power
+            icon: mdi:flash
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: number.peblar_ev_charger_charge_limit
+                name: Current limit
+                icon: mdi:current-ac
+              - type: tile
+                entity: select.peblar_ev_charger_smart_charging
+                name: Solar mode
+                icon: mdi:solar-power-variant
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: switch.peblar_ev_charger_charge
+                name: Charge
+                icon: mdi:play-pause
+              - type: tile
+                entity: switch.peblar_ev_charger_force_single_phase
+                name: Force 1-phase
+                icon: mdi:sine-wave
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.peblar_ev_charger_session_energy
+                name: Session
+                icon: mdi:counter
+              - type: tile
+                entity: sensor.peblar_ev_charger_limit_source
+                name: Limit source
+                icon: mdi:information
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.z003fz_battery_autonomy
+                name: Range
+                icon: mdi:map-marker-distance
+              - type: tile
+                entity: sensor.z003fz_plug_state
+                name: Plug
+                icon: mdi:power-plug
+              - type: tile
+                entity: sensor.z003fz_mileage
+                name: Odometer
+                icon: mdi:counter
+          - type: history-graph
+            title: Charge power — 24h
+            hours_to_show: 24
+            refresh_interval: 60
+            entities:
+              - entity: sensor.peblar_ev_charger_power
+                name: Peblar
+      - type: grid
+        cards:
+          - type: heading
+            heading: Solar Forecast
+            icon: mdi:weather-sunny
+          - type: entities
+            entities:
+              - entity: sensor.solaredge_se6k_ac_power
+                name: Actual (now)
+              - entity: sensor.solar_forecast_now_total
+                name: Forecast now (total)
+              - type: section
+                label: Per orientation — now
+              - entity: sensor.power_production_now
+                name: oost
+              - entity: sensor.power_production_now_2
+                name: west
+              - type: section
+                label: Today
+              - entity: sensor.solar_forecast_today_total
+                name: Total
+              - entity: sensor.energy_production_today
+                name: oost
+              - entity: sensor.energy_production_today_2
+                name: west
+              - type: section
+                label: Remaining today
+              - entity: sensor.solar_forecast_today_remaining_total
+                name: Total
+              - entity: sensor.energy_production_today_remaining
+                name: oost
+              - entity: sensor.energy_production_today_remaining_2
+                name: west
+              - type: section
+                label: Tomorrow
+              - entity: sensor.solar_forecast_tomorrow_total
+                name: Total
+              - entity: sensor.energy_production_tomorrow
+                name: oost
+              - entity: sensor.energy_production_tomorrow_2
+                name: west
+          - type: history-graph
+            title: Solar today — actual vs. forecast (total)
+            hours_to_show: 24
+            refresh_interval: 60
+            entities:
+              - entity: sensor.solaredge_se6k_ac_power
+                name: Actual
+              - entity: sensor.solar_forecast_now_total
+                name: Forecast (total)
+          - type: history-graph
+            title: Forecast breakdown — oost vs. west
+            hours_to_show: 24
+            refresh_interval: 60
+            entities:
+              - entity: sensor.power_production_now
+                name: oost
+              - entity: sensor.power_production_now_2
+                name: west
+      - type: grid
+        cards:
+          - type: heading
+            heading: Power — 6h
+            icon: mdi:chart-line
+          - type: history-graph
+            hours_to_show: 6
+            refresh_interval: 30
+            entities:
+              - entity: sensor.homewizard_p1_vermogen
+                name: P1
+              - entity: sensor.solaredge_se6k_ac_power
+                name: Solar
+              - entity: sensor.zendure_2400_ac_vermogen_aansturing
+                name: Zen setpoint
+              - entity: sensor.peblar_ev_charger_power
+                name: Peblar
+          - type: history-graph
+            hours_to_show: 6
+            refresh_interval: 30
+            entities:
+              - entity: sensor.zendure_signed_power
+                name: Zendure
+              - entity: sensor.plug_in_battery_power
+                name: PIB 1
+              - entity: sensor.plug_in_battery_power_2
+                name: PIB 2
+      - type: grid
+        cards:
+          - type: heading
+            heading: Coordinator & Efficiency
+            icon: mdi:brain
+          - type: entities
+            title: Control signals
+            entities:
+              - entity: sensor.p1_nom_doel
+                name: P1 NOM doel
+              - entity: sensor.p1_aansturing_vermogen
+                name: P1 aansturing
+              - entity: sensor.zendure_2400_ac_vermogen_aansturing
+                name: Zendure setpoint
+              - entity: sensor.zendure_2400_ac_modus
+                name: Zendure modus
+              - entity: sensor.zendure_2400_ac_opslagmodus
+                name: Zendure opslagmodus
+              - entity: sensor.zendure_2400_ac_relais_stand
+                name: Relais stand
+          - type: entities
+            title: Battery health
+            entities:
+              - entity: sensor.zendure_2400_ac_omvormer_temperatuur
+                name: Inverter temp
+              - entity: sensor.zendure_2400_ac_batterijspanning
+                name: Battery voltage
+              - entity: sensor.zendure_2400_ac_relais_schakelingen_totaal_vandaag
+                name: Relay clicks today
+              - entity: sensor.zendure_2400_ac_relais_schakelingen_opladen_vandaag
+                name: Relay clicks charge
+              - entity: sensor.zendure_2400_ac_relais_schakelingen_ontladen_vandaag
+                name: Relay clicks discharge
+              - entity: sensor.plug_in_battery_battery_cycles
+                name: PIB 1 cycles
+              - entity: sensor.plug_in_battery_battery_cycles_2
+                name: PIB 2 cycles
+          - type: entities
+            title: Round-trip efficiency
+            entities:
+              - type: section
+                label: Zendure
+              - entity: sensor.zendure_2400_ac_rte_totaal
+                name: RTE totaal
+              - entity: sensor.zendure_2400_ac_efficientie_import
+                name: Import n
+              - entity: sensor.zendure_2400_ac_efficientie_export
+                name: Export n
+              - entity: sensor.zendure_2400_ac_efficientie_import_24u_gemiddelde
+                name: Import n (24u)
+              - entity: sensor.zendure_2400_ac_efficientie_export_24u_gemiddelde
+                name: Export n (24u)
+          - type: markdown
+            title: Energy totals & lifetime RTE
+            content: >
+              {% set zi =
+              states('sensor.zendure_2400_ac_energie_import')|float(0) %}
+
+              {% set ze =
+              states('sensor.zendure_2400_ac_energie_export')|float(0) %}
+
+              {% set i1 =
+              states('sensor.plug_in_battery_energy_import')|float(0) %}
+
+              {% set e1 =
+              states('sensor.plug_in_battery_energy_export')|float(0) %}
+
+              {% set i2 =
+              states('sensor.plug_in_battery_energy_import_2')|float(0) %}
+
+              {% set e2 =
+              states('sensor.plug_in_battery_energy_export_2')|float(0) %}
+
+              {% set ti = zi + i1 + i2 %}
+
+              {% set te = ze + e1 + e2 %}
+
+              | Battery | In (kWh) | Out (kWh) | RTE |
+
+              |---|---:|---:|---:|
+
+              | Zendure | {{ '%.1f' % zi }} | {{ '%.1f' % ze }} | {{ '%.1f' %
+              (ze/zi*100) if zi > 0 else 0 }}% |
+
+              | PIB 1 | {{ '%.1f' % i1 }} | {{ '%.1f' % e1 }} | {{ '%.1f' %
+              (e1/i1*100) if i1 > 0 else 0 }}% |
+
+              | PIB 2 | {{ '%.1f' % i2 }} | {{ '%.1f' % e2 }} | {{ '%.1f' %
+              (e2/i2*100) if i2 > 0 else 0 }}% |
+
+              | **Total** | **{{ '%.1f' % ti }}** | **{{ '%.1f' % te }}** | **{{
+              '%.1f' % (te/ti*100) if ti > 0 else 0 }}%** |
+      - type: grid
+        cards:
+          - type: heading
+            heading: P1 phase breakdown
+            icon: mdi:sine-wave
+          - type: history-graph
+            hours_to_show: 6
+            refresh_interval: 60
+            entities:
+              - entity: sensor.p1_meter_5c2faf08ea4a_active_power_l1
+                name: L1
+              - entity: sensor.p1_meter_5c2faf08ea4a_active_power_l2
+                name: L2
+              - entity: sensor.p1_meter_5c2faf08ea4a_active_power_l3
+                name: L3
+          - type: entities
+            entities:
+              - sensor.p1_meter_5c2faf08ea4a_active_power
+              - sensor.p1_meter_5c2faf08ea4a_active_voltage_l1
+              - sensor.p1_meter_5c2faf08ea4a_active_voltage_l2
+              - sensor.p1_meter_5c2faf08ea4a_active_voltage_l3
+              - sensor.p1_meter_5c2faf08ea4a_active_current_l1
+              - sensor.p1_meter_5c2faf08ea4a_active_current_l2
+              - sensor.p1_meter_5c2faf08ea4a_active_current_l3
+              - sensor.p1_nul_import_duur_vandaag
+
