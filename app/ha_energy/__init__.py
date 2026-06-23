@@ -254,15 +254,33 @@ def poll():
     gc.collect()
 
 # ---- input ------------------------------------------------------------------
-state = {'nav': 0, 'exit': False}
+state = {'nav': 0, 'exit': False, 'paused': False,
+         'bright': int(CFG.get('brightness', 10))}      # 1..30
 def cb_left(d):
-    if d: state['nav'] = -1
+    if d:
+        state['nav'] = -1
+        state['paused'] = True          # manual step latches auto-rotate off
 def cb_right(d):
-    if d: state['nav'] = 1
+    if d:
+        state['nav'] = 1
+        state['paused'] = True
+def cb_up(d):
+    if d:
+        state['bright'] = min(30, state['bright'] + 2)
+def cb_down(d):
+    if d:
+        state['bright'] = max(1, state['bright'] - 2)
+def cb_a(d):
+    if d:
+        state['paused'] = not state['paused']   # toggle auto-rotate
 def cb_b(d):
-    if d: state['exit'] = True
+    if d:
+        state['exit'] = True
 buttons.register(defines.BTN_LEFT, cb_left)
 buttons.register(defines.BTN_RIGHT, cb_right)
+buttons.register(defines.BTN_UP, cb_up)
+buttons.register(defines.BTN_DOWN, cb_down)
+buttons.register(defines.BTN_A, cb_a)
 buttons.register(defines.BTN_B, cb_b)
 
 def render(s):
@@ -274,7 +292,8 @@ def render(s):
 def main():
     global blink_on
     rgb.background((0, 0, 0))
-    rgb.brightness(int(CFG.get('brightness', 10)))
+    cur_bright = state['bright']
+    rgb.brightness(cur_bright)
     if not wifi.status():
         wifi.connect(); wifi.wait()
     if wifi.status():
@@ -282,9 +301,11 @@ def main():
     idx = 0
     last_poll = time.ticks_ms()
     last_adv = time.ticks_ms()
-    paused_until = time.ticks_ms()
     while not state['exit']:
         now = time.ticks_ms()
+        if state['bright'] != cur_bright:          # UP/DOWN changed brightness
+            cur_bright = state['bright']
+            rgb.brightness(cur_bright)
         if wifi.status() and time.ticks_diff(now, last_poll) >= POLL_MS:
             poll(); last_poll = now
         active = active_stats()
@@ -292,9 +313,8 @@ def main():
         if state['nav'] != 0:
             idx = (idx + state['nav']) % n
             state['nav'] = 0
-            paused_until = time.ticks_add(now, 6000)
             last_adv = now
-        elif time.ticks_diff(now, last_adv) >= 2500 and time.ticks_diff(now, paused_until) >= 0:
+        elif (not state['paused']) and time.ticks_diff(now, last_adv) >= 2500:
             idx = (idx + 1) % n
             last_adv = now
         if idx >= n:
