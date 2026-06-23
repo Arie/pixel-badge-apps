@@ -37,37 +37,265 @@ AMBER  = (0xff, 0x9d, 0x3a)   # SOC mid
 RED    = (0xff, 0x4d, 0x4d)   # SOC low
 ALERT  = (0xff, 0x2a, 0x2a)   # overflow (blinking)
 
-# ---- 3x5 font ---------------------------------------------------------------
-FONT = {
- '0':["###","# #","# #","# #","###"],'1':[" # ","## "," # "," # ","###"],
- '2':["###","  #","###","#  ","###"],'3':["###","  #","###","  #","###"],
- '4':["# #","# #","###","  #","  #"],'5':["###","#  ","###","  #","###"],
- '6':["###","#  ","###","# #","###"],'7':["###","  #","  #","  #","  #"],
- '8':["###","# #","###","# #","###"],'9':["###","# #","###","  #","###"],
- 'A':["###","# #","###","# #","# #"],'B':["## ","# #","## ","# #","## "],
- 'C':["###","#  ","#  ","#  ","###"],'D':["## ","# #","# #","# #","## "],
- 'E':["###","#  ","###","#  ","###"],'F':["###","#  ","###","#  ","#  "],
- 'G':["###","#  ","# #","# #","###"],'H':["# #","# #","###","# #","# #"],
- 'I':["###"," # "," # "," # ","###"],'K':["# #","# #","## ","# #","# #"],
- 'L':["#  ","#  ","#  ","#  ","###"],'N':["# #","###","###","###","# #"],
- 'O':["###","# #","# #","# #","###"],'P':["###","# #","###","#  ","#  "],
- 'R':["## ","# #","## ","# #","# #"],'S':["###","#  ","###","  #","###"],
- 'T':["###"," # "," # "," # "," # "],'U':["# #","# #","# #","# #","###"],
- 'W':["# #","# #","###","###","# #"],'Z':["###","  #"," # ","#  ","###"],
- '.':["   ","   ","   ","   ","#  "],'-':["   ","   ","###","   ","   "],
- '+':["   "," # ","###"," # ","   "],'%':["#  ","  #"," # ","#  ","  #"],
- ' ':["   ","   ","   ","   ","   "],
-}
+# ---- pixel-art tables ------------------------------------------------------
+# Glyphs/icons are drawn as art: '#' = lit pixel, '.' = off. Parsed to rows at
+# load. (Dots, not spaces, so trailing-whitespace tooling can't corrupt them.)
+def _glyph(a):
+    return a.strip("\n").split("\n")
 
-# ---- 8x5 icons --------------------------------------------------------------
-ICONS = {
- 'SUN':  [" # ## # ","  ####  ","########","  ####  "," # ## # "],
- 'HOME': ["   ##   ","  ####  "," ###### "," #    # "," # ## # "],
- 'SELF': ["   ##   ","  ####  "," ###### "," ###### "," ###### "],
- 'GRID': ["   ##   "," ###### ","  #  #  "," ###### ","#      #"],
- 'BATT': ["#####   ","#   #   ","#   ##  ","#   #   ","#####   "],
- 'BOLT': ["   ###  ","  ##    "," #####  ","    ##  ","   ##   "],
-}
+# 3x5 font
+FONT = {ch: _glyph(a) for ch, a in {
+'0': """
+###
+#.#
+#.#
+#.#
+###""",
+'1': """
+.#.
+##.
+.#.
+.#.
+###""",
+'2': """
+###
+..#
+###
+#..
+###""",
+'3': """
+###
+..#
+###
+..#
+###""",
+'4': """
+#.#
+#.#
+###
+..#
+..#""",
+'5': """
+###
+#..
+###
+..#
+###""",
+'6': """
+###
+#..
+###
+#.#
+###""",
+'7': """
+###
+..#
+..#
+..#
+..#""",
+'8': """
+###
+#.#
+###
+#.#
+###""",
+'9': """
+###
+#.#
+###
+..#
+###""",
+'A': """
+###
+#.#
+###
+#.#
+#.#""",
+'B': """
+##.
+#.#
+##.
+#.#
+##.""",
+'C': """
+###
+#..
+#..
+#..
+###""",
+'D': """
+##.
+#.#
+#.#
+#.#
+##.""",
+'E': """
+###
+#..
+###
+#..
+###""",
+'F': """
+###
+#..
+###
+#..
+#..""",
+'G': """
+###
+#..
+#.#
+#.#
+###""",
+'H': """
+#.#
+#.#
+###
+#.#
+#.#""",
+'I': """
+###
+.#.
+.#.
+.#.
+###""",
+'K': """
+#.#
+#.#
+##.
+#.#
+#.#""",
+'L': """
+#..
+#..
+#..
+#..
+###""",
+'N': """
+#.#
+###
+###
+###
+#.#""",
+'O': """
+###
+#.#
+#.#
+#.#
+###""",
+'P': """
+###
+#.#
+###
+#..
+#..""",
+'R': """
+##.
+#.#
+##.
+#.#
+#.#""",
+'S': """
+###
+#..
+###
+..#
+###""",
+'T': """
+###
+.#.
+.#.
+.#.
+.#.""",
+'U': """
+#.#
+#.#
+#.#
+#.#
+###""",
+'W': """
+#.#
+#.#
+###
+###
+#.#""",
+'Z': """
+###
+..#
+.#.
+#..
+###""",
+'.': """
+...
+...
+...
+...
+#..""",
+'-': """
+...
+...
+###
+...
+...""",
+'+': """
+...
+.#.
+###
+.#.
+...""",
+'%': """
+#..
+..#
+.#.
+#..
+..#""",
+' ': """
+...
+...
+...
+...
+...""",
+}.items()}
+
+# 8x5 icons (SUN=SOL, HOME=USE, SELF, GRID=tower, BATT=SOC, BOLT=battery power)
+ICONS = {ch: _glyph(a) for ch, a in {
+'SUN': """
+.#.##.#.
+..####..
+########
+..####..
+.#.##.#.""",
+'HOME': """
+...##...
+..####..
+.######.
+.#....#.
+.#.##.#.""",
+'SELF': """
+...##...
+..####..
+.######.
+.######.
+.######.""",
+'GRID': """
+...##...
+.######.
+..#..#..
+.######.
+#......#""",
+'BATT': """
+#####...
+#...#...
+#...##..
+#...#...
+#####...""",
+'BOLT': """
+...###..
+..##....
+.#####..
+....##..
+...##...""",
+}.items()}
 
 # ---- stats (entities come from config) --------------------------------------
 STATS = [
@@ -321,36 +549,41 @@ def main():
         wifi.connect(); wifi.wait()
     if wifi.status():
         poll()
-    seq = active_stats()
+    seq = active_stats()                            # cached; only rebuilt when data changes
     cur_id = seq[0]['id']
     last_poll = time.ticks_ms()
     last_adv = time.ticks_ms()
+    active_until = time.ticks_ms()                  # "recently touched" window for snappy input
     dirty = True
     prev_blink = False
     while not state['exit']:
         now = time.ticks_ms()
-        if state['bright'] != cur_bright:          # UP/DOWN changed brightness
+        if state['bright'] != cur_bright:           # UP/DOWN changed brightness
             cur_bright = state['bright']
-            rgb.brightness(cur_bright)             # applies live; no re-render needed
+            rgb.brightness(cur_bright)              # applies live; no re-render needed
+            active_until = time.ticks_add(now, 1200)
         if wifi.status() and time.ticks_diff(now, last_poll) >= POLL_MS:
-            poll(); last_poll = now; dirty = True  # fresh data -> redraw current
-        seq = active_stats()
+            poll(); last_poll = now                 # fresh data...
+            seq = active_stats()                    # ...the active set only changes here
+            dirty = True
         # locate the current stat by IDENTITY (so a poll reshuffle doesn't jump it)
-        pos = -1
+        pos = 0
         for i in range(len(seq)):
             if seq[i]['id'] == cur_id:
                 pos = i; break
-        if pos < 0:                                # current stat went idle/away
-            pos = 0; cur_id = seq[0]['id']; dirty = True
+        else:                                       # current stat went idle/away
+            cur_id = seq[0]['id']; dirty = True
         if state['nav'] != 0:
             pos = (pos + state['nav']) % len(seq)
             cur_id = seq[pos]['id']; state['nav'] = 0; last_adv = now; dirty = True
+            active_until = time.ticks_add(now, 1200)
         elif (not state['paused']) and time.ticks_diff(now, last_adv) >= 2500:
             pos = (pos + 1) % len(seq)
             cur_id = seq[pos]['id']; last_adv = now; dirty = True
         cur = seq[pos]
+        overflow = is_overflow(cur)
         blink_on = (now // 450) % 2 == 0
-        if blink_on != prev_blink and is_overflow(cur):
+        if overflow and blink_on != prev_blink:
             dirty = True                            # animate the overflow blink only
         prev_blink = blink_on
         if dirty:                                   # render ONLY on change -> no per-frame flicker
@@ -359,7 +592,13 @@ def main():
             except Exception as e:
                 sys.print_exception(e)
             dirty = False
-        time.sleep_ms(40)
+        # adaptive idle: snappy right after a press, quick while blinking, relaxed otherwise
+        if time.ticks_diff(now, active_until) < 0:
+            time.sleep_ms(50)
+        elif overflow:
+            time.sleep_ms(120)
+        else:
+            time.sleep_ms(220)
     rgb.clear()
     system.home()
 
