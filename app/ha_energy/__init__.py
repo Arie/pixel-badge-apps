@@ -67,7 +67,7 @@ STATS = [
  {'id':'HW2', 'label':'HW2', 'kind':'battery','socId':'HW2','powerId':'HW2P','weight':1,'socMin':0},
  {'id':'ZEN', 'label':'ZEN', 'kind':'battery','socId':'ZEN','powerId':'ZENP','weight':3,'socMin':10},
 ]
-BATSUM = {'kind':'batsummary'}
+BATSUM = {'kind':'batsummary', 'id':'BAT'}
 VALUES = {}     # id -> float (raw HA readings)
 
 # ---- framebuffer ------------------------------------------------------------
@@ -141,7 +141,8 @@ def value_of(s):
                 VALUES.get('HW1P', 0) - VALUES.get('HW2P', 0) - VALUES.get('ZENP', 0))
     if k == 'self':
         g = VALUES.get('GRID', 0)
-        return VALUES.get('SOL', 0) - (-g if g < 0 else 0)
+        sv = VALUES.get('SOL', 0) - (-g if g < 0 else 0)   # solar minus solar-exported
+        return sv if sv > 0 else 0                          # never negative (battery export ≠ neg self-use)
     return VALUES.get(s['id'], 0)
 def is_signed(s):
     return s['kind'] == 'grid'
@@ -288,6 +289,15 @@ def render(s):
     draw_stat(s)
     fb_blit()
 
+def is_overflow(s):                       # does this stat blink (value over its max)?
+    k = s['kind']
+    if k == 'grid':
+        v = value_of(s)
+        return abs(v) > (s['maxNeg'] if v < 0 else s['maxPos'])
+    if k == 'use' or k == 'self' or k == 'power':
+        return abs(value_of(s)) > s['max']
+    return False
+
 # ---- main -------------------------------------------------------------------
 def main():
     global blink_on
@@ -298,33 +308,45 @@ def main():
         wifi.connect(); wifi.wait()
     if wifi.status():
         poll()
-    idx = 0
+    seq = active_stats()
+    cur_id = seq[0]['id']
     last_poll = time.ticks_ms()
     last_adv = time.ticks_ms()
+    dirty = True
+    prev_blink = False
     while not state['exit']:
         now = time.ticks_ms()
         if state['bright'] != cur_bright:          # UP/DOWN changed brightness
             cur_bright = state['bright']
-            rgb.brightness(cur_bright)
+            rgb.brightness(cur_bright)             # applies live; no re-render needed
         if wifi.status() and time.ticks_diff(now, last_poll) >= POLL_MS:
-            poll(); last_poll = now
-        active = active_stats()
-        n = len(active)
+            poll(); last_poll = now; dirty = True  # fresh data -> redraw current
+        seq = active_stats()
+        # locate the current stat by IDENTITY (so a poll reshuffle doesn't jump it)
+        pos = -1
+        for i in range(len(seq)):
+            if seq[i]['id'] == cur_id:
+                pos = i; break
+        if pos < 0:                                # current stat went idle/away
+            pos = 0; cur_id = seq[0]['id']; dirty = True
         if state['nav'] != 0:
-            idx = (idx + state['nav']) % n
-            state['nav'] = 0
-            last_adv = now
+            pos = (pos + state['nav']) % len(seq)
+            cur_id = seq[pos]['id']; state['nav'] = 0; last_adv = now; dirty = True
         elif (not state['paused']) and time.ticks_diff(now, last_adv) >= 2500:
-            idx = (idx + 1) % n
-            last_adv = now
-        if idx >= n:
-            idx = 0
-        blink_on = (time.ticks_ms() // 450) % 2 == 0
-        try:
-            render(active[idx])
-        except Exception as e:
-            sys.print_exception(e)
-        time.sleep_ms(66)
+            pos = (pos + 1) % len(seq)
+            cur_id = seq[pos]['id']; last_adv = now; dirty = True
+        cur = seq[pos]
+        blink_on = (now // 450) % 2 == 0
+        if blink_on != prev_blink and is_overflow(cur):
+            dirty = True                            # animate the overflow blink only
+        prev_blink = blink_on
+        if dirty:                                   # render ONLY on change -> no per-frame flicker
+            try:
+                render(cur)
+            except Exception as e:
+                sys.print_exception(e)
+            dirty = False
+        time.sleep_ms(40)
     rgb.clear()
     system.home()
 

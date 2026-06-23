@@ -29,7 +29,7 @@
 
   // kinds:
   //   power    — W, unidirectional gauge (left→right), one colour
-  //   use      — derived consumption = solar + grid + Σbattery (purple), can overflow MAX.USE
+  //   use      — derived consumption = solar + grid - Σbattery (purple), can overflow MAX.USE
   //   self     — derived self-use = solar - export (light blue)
   //   grid     — signed W, gauge anchored by sign (import←left / export→right)
   //   battery  — composite per battery: "HWx NN%" label+SOC + power as the bottom bar
@@ -79,7 +79,7 @@
   const SAMPLE = { solar: 3284, grid: -984, batteries: 250 + 0 + 600 };
   function value(stat) {
     if (stat.kind === 'use')  return SAMPLE.solar + SAMPLE.grid - SAMPLE.batteries;
-    if (stat.kind === 'self') return SAMPLE.solar - Math.max(0, -SAMPLE.grid);
+    if (stat.kind === 'self') return Math.max(0, SAMPLE.solar - Math.max(0, -SAMPLE.grid));
     if (stat.kind === 'battery') return stat.sampleSoc;
     return stat.sample;
   }
