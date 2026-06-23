@@ -2,19 +2,31 @@
 # Single auto-advancing gauge view; LEFT/RIGHT step, B exits.
 # Ported from the mockup in pixel-badge-apps/mockup. See docs/ for the design.
 
-import sys, time, ujson as json, gc
-import rgb, hub75, wifi, buttons, defines, system
-import urequests as requests
+import sys, time, gc
+try:
+    import ujson as json
+except ImportError:                              # host (tests/lint) uses stdlib json
+    import json
+
+try:                                             # badge-only hardware modules
+    import rgb, hub75, wifi, buttons, defines, system
+    import urequests as requests
+    ON_BADGE = True
+except ImportError:                              # host: the pure logic still imports fine
+    ON_BADGE = False
 
 W, H = 32, 8
 
 # ---- config (token + entity map; gitignored) --------------------------------
-with open('apps/ha_energy/config.json') as f:
-    CFG = json.load(f)
-BASE = CFG['base_url']
+try:
+    with open('apps/ha_energy/config.json') as f:
+        CFG = json.load(f)
+except OSError:                                  # absent off-device; pure logic doesn't need it
+    CFG = {}
+BASE = CFG.get('base_url', '')
 POLL_MS = int(CFG.get('poll_seconds', 10)) * 1000
-ENTITIES = CFG['entities']                       # id -> HA entity_id
-HEADERS = {'Authorization': 'Bearer ' + CFG['token']}
+ENTITIES = CFG.get('entities', {})               # id -> HA entity_id
+HEADERS = {'Authorization': 'Bearer ' + CFG.get('token', '')}
 IDLE_W = 10                                       # |power| below this = idle
 
 # ---- colours (tuned on the panel) -------------------------------------------
@@ -277,12 +289,13 @@ def cb_a(d):
 def cb_b(d):
     if d:
         state['exit'] = True
-buttons.register(defines.BTN_LEFT, cb_left)
-buttons.register(defines.BTN_RIGHT, cb_right)
-buttons.register(defines.BTN_UP, cb_up)
-buttons.register(defines.BTN_DOWN, cb_down)
-buttons.register(defines.BTN_A, cb_a)
-buttons.register(defines.BTN_B, cb_b)
+if ON_BADGE:
+    buttons.register(defines.BTN_LEFT, cb_left)
+    buttons.register(defines.BTN_RIGHT, cb_right)
+    buttons.register(defines.BTN_UP, cb_up)
+    buttons.register(defines.BTN_DOWN, cb_down)
+    buttons.register(defines.BTN_A, cb_a)
+    buttons.register(defines.BTN_B, cb_b)
 
 def render(s):
     fb_clear()
@@ -350,4 +363,5 @@ def main():
     rgb.clear()
     system.home()
 
-main()
+if ON_BADGE:        # the badge launches the app by importing it; host import stays inert
+    main()

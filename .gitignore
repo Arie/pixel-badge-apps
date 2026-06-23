@@ -7,3 +7,10 @@ app/config.json
 
 # HA token
 .ha-token
+
+# Python tooling
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

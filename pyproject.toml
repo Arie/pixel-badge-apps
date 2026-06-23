@@ -1,0 +1,39 @@
+[project]
+name = "pixel-badge-apps"
+version = "0.1.0"
+description = "MicroPython apps for the CampZone 2019 'Pixel' badge (Home Assistant energy display)"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false                       # this repo ships apps + tooling, not an installable package
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6.0",
+    "pyserial>=3.5",                  # used by tools/badge.py (serial deploy / REPL)
+]
+
+# ---- ruff (lint + format) ---------------------------------------------------
+[tool.ruff]
+line-length = 100
+extend-exclude = ["mockup", ".superpowers", "app/ha_energy/icon.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["UP031", "UP032"]   # %-formatting is required on the MicroPython badge (no f-strings)
+
+[tool.ruff.lint.per-file-ignores]
+# The badge app is MicroPython: grouped/guarded imports, a config block between
+# imports, chained one-line ifs, and compact font/icon tables are intentional.
+"app/ha_energy/__init__.py" = ["E401", "E402", "E701", "E702", "E731", "E741", "E501", "I001"]
+
+[tool.ruff.format]
+# Keep the compact, hand-tuned MicroPython layout (font/icon tables) as-is.
+exclude = ["app/ha_energy/__init__.py"]
+
+# ---- pytest -----------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
