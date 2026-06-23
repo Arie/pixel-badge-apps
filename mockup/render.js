@@ -5,6 +5,14 @@
   const PF = global.PixelFont;
   const Blink = global.Blink || (global.Blink = { on: true });
 
+  // Shrink a value to fit `avail` px: drop the 'W' from KW, then a decimal.
+  function fitValue(txt, avail) {
+    if (PF.textWidth(txt) <= avail) return txt;
+    txt = txt.replace('KW', 'K');
+    if (PF.textWidth(txt) <= avail) return txt;
+    return txt.replace(/(\.\d)\d/, '$1');           // 2.40K -> 2.4K
+  }
+
   // Flow-stat gauge bar: anchored by sign, scaled to the stat max, blinks red over max.
   function gauge(matrix, b, s, v, col) {
     const max = s.kind === 'grid' ? (v < 0 ? s.maxNeg : s.maxPos) : s.max;
@@ -33,13 +41,14 @@
       // 2px gap (not a full 4px space char) so "HW1 +250W" fits in 32px.
       const pw = s.samplePower, pc = C.powerColor(pw);   // charge=purple, discharge=green
       PF.drawText(b, 0, 0, s.label, pc);
-      PF.drawText(b, PF.textWidth(s.label) + 2, 0, C.fmtBat(pw), pc);
+      const lx = PF.textWidth(s.label) + 2;
+      PF.drawText(b, lx, 0, fitValue(C.fmtBat(pw), 32 - lx), pc);
       matrix.barLeft(b, 7, C.displaySoc(s) / 100, pc);   // usable SOC (ZEN floored at 10%)
       return;
     }
     const v = C.value(s), col = C.colorOf(s, v);
     matrix.icon(b, 0, 0, s.icon, col);
-    PF.drawText(b, 9, 0, C.fmt(s, v), col);
+    PF.drawText(b, 9, 0, fitValue(C.fmt(s, v), 32 - 9), col);
     gauge(matrix, b, s, v, col);
   }
 

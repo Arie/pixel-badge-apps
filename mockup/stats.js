@@ -98,10 +98,12 @@
     const k = a / 1000;                                 // 2 decimals < 10kW, 1 decimal above
     return sign + (k >= 10 ? k.toFixed(1) : k.toFixed(2)) + 'KW';
   }
-  // compact signed battery power (drop the 'W' on kW to fit): +250W, -1.8K
+  // signed battery power; KW preferred (render drops the W if it doesn't fit).
   function fmtBat(v) {
     const a = Math.abs(v), sign = v < 0 ? '-' : '+';
-    return sign + (a < 1000 ? a + 'W' : (a / 1000).toFixed(1) + 'K');
+    if (a < 1000) return sign + a + 'W';
+    const k = a / 1000;
+    return sign + (k >= 10 ? k.toFixed(1) : k.toFixed(2)) + 'KW';
   }
   function fmt(stat, v) {
     if (stat.kind === 'soc') return v + '%';
