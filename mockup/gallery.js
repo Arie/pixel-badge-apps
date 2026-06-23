@@ -26,11 +26,16 @@
 
   // --- All stats (single gauge view) ---
   function caption(s) {
-    if (s.kind === 'battery') return s.id + '  ·  ' + s.sampleSoc + '% / ' + C.fmtPower(s.samplePower, true);
-    return s.id + '  ·  ' + C.fmt(s, C.value(s));
+    const idle = C.isActive(s) ? '' : '  — idle (hidden)';
+    if (s.kind === 'battery') return s.id + '  ·  ' + s.sampleSoc + '% / ' + C.fmtPower(s.samplePower, true) + idle;
+    return s.id + '  ·  ' + C.fmt(s, C.value(s)) + idle;
   }
   const gaugeGrid = document.getElementById('gauge');
   C.STATS.forEach(s => R.renderInto(tile(gaugeGrid, caption(s)), s));
+  // BAT summary screen (shown only when ALL batteries are idle): 0W + fleet SOC gauge
+  R.renderInto(tile(gaugeGrid, 'BAT summary · all full'),  { kind: 'batsummary', avg: 100 });
+  R.renderInto(tile(gaugeGrid, 'BAT summary · live weighted (ZEN×3)'), { kind: 'batsummary' });
+  R.renderInto(tile(gaugeGrid, 'BAT summary · all empty'), { kind: 'batsummary', avg: 0 });
 
   // --- Edge cases ---
   const edgeGrid = document.getElementById('edges');

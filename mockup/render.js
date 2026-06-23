@@ -19,14 +19,22 @@
   }
 
   function drawStat(matrix, b, s) {
+    if (s.kind === 'batsummary') {
+      // all batteries idle → one screen: icon + 0W + fleet-SOC gauge (weighted avg)
+      const avg = (s.avg !== undefined) ? s.avg : C.fleetSoc();
+      const col = C.socColor(avg);
+      matrix.icon(b, 0, 0, 'BATT', col);
+      PF.drawText(b, 9, 0, '0W', col);
+      matrix.barLeft(b, 7, avg / 100, col);
+      return;
+    }
     if (s.kind === 'battery') {
-      // identifier + signed power number (colour = charge/discharge); SOC as the bar.
+      // identifier + signed power number (colour = charge/discharge); usable SOC as the bar.
       // 2px gap (not a full 4px space char) so "HW1 +250W" fits in 32px.
-      const soc = s.sampleSoc, pw = s.samplePower;
-      const pc = C.powerColor(pw);                 // one colour: charge=purple, discharge=green
+      const pw = s.samplePower, pc = C.powerColor(pw);   // charge=purple, discharge=green
       PF.drawText(b, 0, 0, s.label, pc);
       PF.drawText(b, PF.textWidth(s.label) + 2, 0, C.fmtBat(pw), pc);
-      matrix.barLeft(b, 7, soc / 100, pc);         // SOC bar matches the power-level colour
+      matrix.barLeft(b, 7, C.displaySoc(s) / 100, pc);   // usable SOC (ZEN floored at 10%)
       return;
     }
     const v = C.value(s), col = C.colorOf(s, v);

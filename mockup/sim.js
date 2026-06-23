@@ -4,7 +4,7 @@
   const C = window.EnergyConfig, R = window.EnergyRender;
   const matrixEl = document.getElementById('matrix');
   const matrix = new window.Matrix(matrixEl);
-  const STATS = C.STATS;
+  const STATS = C.activeStats();    // idle batteries / solar filtered out; BAT summary if all idle
 
   let stat = 0, paused_until = 0;
 
