@@ -540,65 +540,78 @@ def is_overflow(s):                       # does this stat blink (value over its
     return False
 
 # ---- main -------------------------------------------------------------------
+class Carousel:
+    """The visible stat, tracked by IDENTITY. After a poll rebuilds the active
+    list, the same stat keeps showing instead of jumping to whatever now sits at
+    its old index."""
+    def __init__(self, seq):
+        self.seq = seq
+        self.cur_id = seq[0]['id']
+    def refresh(self, seq):
+        self.seq = seq
+        if not any(s['id'] == self.cur_id for s in seq):
+            self.cur_id = seq[0]['id']              # current stat went idle/away
+    def _pos(self):
+        for i in range(len(self.seq)):
+            if self.seq[i]['id'] == self.cur_id:
+                return i
+        return 0
+    def step(self, n):
+        self.cur_id = self.seq[(self._pos() + n) % len(self.seq)]['id']
+    def current(self):
+        return self.seq[self._pos()]
+
+def idle_ms(now, touched, overflow):
+    """How long to sleep: snappy just after a press, quicker while blinking."""
+    if time.ticks_diff(now, touched) < 1200:
+        return 50
+    return 120 if overflow else 220
+
 def main():
     global blink_on
     rgb.background((0, 0, 0))
-    cur_bright = state['bright']
-    rgb.brightness(cur_bright)
+    bright = state['bright']; rgb.brightness(bright)
     if not wifi.status():
         wifi.connect(); wifi.wait()
     if wifi.status():
         poll()
-    seq = active_stats()                            # cached; only rebuilt when data changes
-    cur_id = seq[0]['id']
-    last_poll = time.ticks_ms()
-    last_adv = time.ticks_ms()
-    active_until = time.ticks_ms()                  # "recently touched" window for snappy input
+
+    car = Carousel(active_stats())
+    last_poll = last_adv = touched = time.ticks_ms()
     dirty = True
     prev_blink = False
     while not state['exit']:
         now = time.ticks_ms()
-        if state['bright'] != cur_bright:           # UP/DOWN changed brightness
-            cur_bright = state['bright']
-            rgb.brightness(cur_bright)              # applies live; no re-render needed
-            active_until = time.ticks_add(now, 1200)
+
+        if state['bright'] != bright:               # UP/DOWN brightness (applies live)
+            bright = state['bright']; rgb.brightness(bright); touched = now
+
         if wifi.status() and time.ticks_diff(now, last_poll) >= POLL_MS:
-            poll(); last_poll = now                 # fresh data...
-            seq = active_stats()                    # ...the active set only changes here
-            dirty = True
-        # locate the current stat by IDENTITY (so a poll reshuffle doesn't jump it)
-        pos = 0
-        for i in range(len(seq)):
-            if seq[i]['id'] == cur_id:
-                pos = i; break
-        else:                                       # current stat went idle/away
-            cur_id = seq[0]['id']; dirty = True
-        if state['nav'] != 0:
-            pos = (pos + state['nav']) % len(seq)
-            cur_id = seq[pos]['id']; state['nav'] = 0; last_adv = now; dirty = True
-            active_until = time.ticks_add(now, 1200)
-        elif (not state['paused']) and time.ticks_diff(now, last_adv) >= 2500:
-            pos = (pos + 1) % len(seq)
-            cur_id = seq[pos]['id']; last_adv = now; dirty = True
-        cur = seq[pos]
+            poll(); last_poll = now                 # new readings...
+            car.refresh(active_stats()); dirty = True   # ...the active set may change here
+
+        if state['nav']:                            # LEFT / RIGHT step
+            car.step(state['nav']); state['nav'] = 0
+            last_adv = touched = now; dirty = True
+        elif not state['paused'] and time.ticks_diff(now, last_adv) >= 2500:
+            car.step(1); last_adv = now; dirty = True   # auto-advance
+
+        cur = car.current()
         overflow = is_overflow(cur)
         blink_on = (now // 450) % 2 == 0
-        if overflow and blink_on != prev_blink:
-            dirty = True                            # animate the overflow blink only
+        if overflow and blink_on != prev_blink:     # animate the overflow blink
+            dirty = True
         prev_blink = blink_on
-        if dirty:                                   # render ONLY on change -> no per-frame flicker
+
+        if dirty:                                   # redraw only when the picture changes
             try:
                 render(cur)
             except Exception as e:
                 sys.print_exception(e)
             dirty = False
-        # adaptive idle: snappy right after a press, quick while blinking, relaxed otherwise
-        if time.ticks_diff(now, active_until) < 0:
-            time.sleep_ms(50)
-        elif overflow:
-            time.sleep_ms(120)
-        else:
-            time.sleep_ms(220)
+
+        time.sleep_ms(idle_ms(now, touched, overflow))
+
     rgb.clear()
     system.home()
 
