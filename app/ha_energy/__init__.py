@@ -17,8 +17,8 @@ ENTITIES = CFG['entities']                       # id -> HA entity_id
 HEADERS = {'Authorization': 'Bearer ' + CFG['token']}
 
 # ---- colours (HomeWizard-inspired, brightened) ------------------------------
-PURPLE = (0x7b, 0x3f, 0xf2)   # consumption / import / battery charging
-GREEN  = (0x33, 0xd9, 0x6f)   # solar / export / battery discharging
+PURPLE = (0x55, 0x18, 0xcc)   # consumption / import / battery charging (deeper)
+GREEN  = (0x2e, 0xd6, 0x40)   # solar / export / battery discharging (less blue)
 LBLUE  = (0x4f, 0xc3, 0xff)   # self-use
 AMBER  = (0xff, 0x9d, 0x3a)   # SOC mid
 RED    = (0xff, 0x4d, 0x4d)   # SOC low

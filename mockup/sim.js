@@ -1,63 +1,49 @@
-// sim.js — controller: maps D-pad/arrow input to mode + stat and renders each
-// mode onto the Matrix. Mirrors the navigation the badge app will use.
+// sim.js — interactive preview. Single gauge view: auto-advances through the
+// stats; LEFT/RIGHT step manually (and pause auto-advance briefly).
 (function () {
-  const C = window.EnergyConfig;
-  const { MODES, STATS } = C;
-  const PF = window.PixelFont;
+  const C = window.EnergyConfig, R = window.EnergyRender;
   const matrixEl = document.getElementById('matrix');
   const matrix = new window.Matrix(matrixEl);
+  const STATS = C.STATS;
 
-  const R = window.EnergyRender;
-  let mode = 0, stat = 0, rotTimer = null, tickTimer = null, tickOff = 32;
+  let stat = 0, paused_until = 0;
 
-  function renderStatic() { R.renderInto(matrix, STATS[stat], false); }
-  function renderGauge()  { R.renderInto(matrix, STATS[stat], true);  }
-  function renderTicker() {
-    const b = window.Matrix.blank();
-    let x = tickOff, total = 0;
-    for (const s of STATS) { const v = C.value(s); x = PF.drawText(b, x, 2, R.tickerSegment(s), C.colorOf(s, v)) + 6; }
-    for (const s of STATS) total += PF.textWidth(R.tickerSegment(s)) + 6;
-    matrix.paint(b);
-    tickOff--; if (tickOff < -total) tickOff = 32;
-  }
-
-  function stop() { clearInterval(rotTimer); clearInterval(tickTimer); rotTimer = tickTimer = null; }
   function render() {
-    stop();
-    if (MODES[mode] === 'Rotate') {
-      renderStatic();
-      rotTimer = setInterval(() => { stat = (stat + 1) % STATS.length; renderStatic(); readout(); }, 2500);
-    } else if (MODES[mode] === 'Ticker') {
-      tickOff = 32; tickTimer = setInterval(renderTicker, 90);
-    } else renderGauge();
+    R.renderInto(matrix, STATS[stat]);
     readout();
   }
   function readout() {
-    document.getElementById('modepills').innerHTML =
-      MODES.map((m, i) => `<span class="pill ${i === mode ? 'on' : ''}">${m}</span>`).join('');
-    const s = STATS[stat], v = C.value(s);
-    const scale = s.kind === 'soc' ? '/100%' : s.max ? ' / ' + C.fmt({ kind: 'power' }, s.max) + ' max' : '';
+    const s = STATS[stat];
+    const val = s.kind === 'battery'
+      ? s.sampleSoc + '% SOC · ' + C.fmtPower(s.samplePower, true) + ' power'
+      : C.fmt(s, C.value(s));
     document.getElementById('readout').innerHTML =
-      `Mode <b>${MODES[mode]}</b> &nbsp;•&nbsp; <b>${s.label}</b> ${s.kind === 'soc' ? 'SOC' : s.kind === 'batpower' ? 'power' : ''} = <b>${C.fmt(s, v)}</b>` +
-      `<span style="color:#678">${scale}</span>` +
-      (MODES[mode] === 'Ticker' ? ' &nbsp;<span style="color:#678">(shows all)</span>' : '');
+      'Stat <b>' + s.label + '</b> = <b>' + val + '</b>' +
+      '<br><span style="color:#678">auto-advancing · ◀ ▶ to step</span>';
+    const pills = document.getElementById('modepills');
+    if (pills) pills.innerHTML = STATS.map((x, i) =>
+      '<span class="pill ' + (i === stat ? 'on' : '') + '">' + x.id + '</span>').join('');
   }
-  function press(k) {
-    if (k === 'up')    mode = (mode + MODES.length - 1) % MODES.length;
-    if (k === 'down')  mode = (mode + 1) % MODES.length;
-    if (k === 'left')  stat = (stat + STATS.length - 1) % STATS.length;
-    if (k === 'right') stat = (stat + 1) % STATS.length;
+  function step(d) {
+    stat = (stat + d + STATS.length) % STATS.length;
+    paused_until = Date.now() + 6000;     // pause auto-advance after manual nav
     render();
   }
 
-  document.querySelectorAll('.dpad button').forEach(b => b.onclick = () => press(b.dataset.k));
-  matrixEl.addEventListener('keydown', e => {
-    const m = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
-    if (m) { e.preventDefault(); press(m); }
+  document.querySelectorAll('.dpad button').forEach(btn => btn.onclick = () => {
+    const k = btn.dataset.k;
+    if (k === 'left') step(-1);
+    else if (k === 'right') step(1);
   });
-  matrixEl.focus();
-  render();
+  matrixEl.setAttribute('tabindex', '0');
+  matrixEl.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+  });
 
-  // Blink phase for overflow gauges; re-render while in Gauge mode.
-  setInterval(() => { window.Blink.on = !window.Blink.on; if (MODES[mode] === 'Gauge') renderGauge(); }, 450);
+  render();
+  setInterval(() => { window.Blink.on = !window.Blink.on; render(); }, 450);   // blink for overflow
+  setInterval(() => {                                                           // auto-advance
+    if (Date.now() > paused_until) { stat = (stat + 1) % STATS.length; render(); }
+  }, 2500);
 })();

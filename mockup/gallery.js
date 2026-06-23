@@ -24,28 +24,22 @@
   [['SUN', 'SOL'], ['HOME', 'USE'], ['SELF', 'SELF'], ['GRID', 'GRID'], ['BATT', 'HW1'], ['BOLT', 'HW1']]
     .forEach(([ic, w]) => iconTile(icons, ic, w, ic));
 
-  // --- Static (centred) row ---
-  const staticGrid = document.getElementById('static');
-  C.STATS.forEach(s => R.renderInto(tile(staticGrid, s.id + '  ·  ' + C.fmt(s, C.value(s))), s, false));
-
-  // --- Gauge row ---
+  // --- All stats (single gauge view) ---
+  function caption(s) {
+    if (s.kind === 'battery') return s.id + '  ·  ' + s.sampleSoc + '% / ' + C.fmtPower(s.samplePower, true);
+    return s.id + '  ·  ' + C.fmt(s, C.value(s));
+  }
   const gaugeGrid = document.getElementById('gauge');
-  C.STATS.forEach(s => R.renderInto(tile(gaugeGrid, s.id + '  ·  ' + C.fmt(s, C.value(s))), s, true));
+  C.STATS.forEach(s => R.renderInto(tile(gaugeGrid, caption(s)), s));
 
-  // --- Gauge edge cases ---
+  // --- Edge cases ---
   const edgeGrid = document.getElementById('edges');
-  const cases = [
-    { label: 'USE overflow 19kW', kind: 'power', icon: 'HOME', color: C.COLORS.consumption, max: C.MAX.USE, _v: 19000 },
-    { label: 'SOL full 6kW',      kind: 'power', icon: 'SUN', color: C.COLORS.solar, max: C.MAX.SOL, _v: 6000 },
-    { label: 'GRID export -5kW',     kind: 'grid', icon: 'GRID', maxPos: C.MAX.GRID_IMPORT, maxNeg: C.MAX.GRID_EXPORT, _v: -5000 },
-    { label: 'GRID exp -8kW OVERFLOW', kind: 'grid', icon: 'GRID', maxPos: C.MAX.GRID_IMPORT, maxNeg: C.MAX.GRID_EXPORT, _v: -8000 },
-    { label: 'GRID import +8kW',     kind: 'grid', icon: 'GRID', maxPos: C.MAX.GRID_IMPORT, maxNeg: C.MAX.GRID_EXPORT, _v: 8000 },
-    { label: 'ZEN charge +2.4kW', kind: 'batpower', icon: 'BOLT', max: C.MAX.ZEN_POWER, _v: 2400 },
-    { label: 'HW dischg -800W',   kind: 'batpower', icon: 'BOLT', max: C.MAX.HW_POWER, _v: -800 },
-    { label: 'SOC low 12%',       kind: 'soc', icon: 'BATT', _v: 12 }
-  ];
-  cases.forEach(cs => {
-    const s = Object.assign({}, cs, { sample: cs._v, id: cs.label, label: cs.label.slice(0, 4) });
-    R.renderInto(tile(edgeGrid, cs.label), s, true);
-  });
+  [
+    { label: 'USE overflow 19kW', kind: 'power', icon: 'HOME', color: C.COLORS.consumption, max: C.MAX.USE, sample: 19000 },
+    { label: 'SOL full 6kW',      kind: 'power', icon: 'SUN', color: C.COLORS.solar, max: C.MAX.SOL, sample: 6000 },
+    { label: 'GRID exp -8kW OVERFLOW', kind: 'grid', icon: 'GRID', maxPos: C.MAX.GRID_IMPORT, maxNeg: C.MAX.GRID_EXPORT, sample: -8000 },
+    { label: 'GRID import +8kW',  kind: 'grid', icon: 'GRID', maxPos: C.MAX.GRID_IMPORT, maxNeg: C.MAX.GRID_EXPORT, sample: 8000 },
+    { label: 'HW1 12% low, charging', kind: 'battery', powerMax: C.MAX.HW_POWER, sampleSoc: 12, samplePower: 600 },
+    { label: 'ZEN 90% discharging',   kind: 'battery', powerMax: C.MAX.ZEN_POWER, sampleSoc: 90, samplePower: -1800 }
+  ].forEach(cs => R.renderInto(tile(edgeGrid, cs.label), cs, true));
 })();
