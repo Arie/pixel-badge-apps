@@ -7,35 +7,16 @@
   const matrixEl = document.getElementById('matrix');
   const matrix = new window.Matrix(matrixEl);
 
+  const R = window.EnergyRender;
   let mode = 0, stat = 0, rotTimer = null, tickTimer = null, tickOff = 32;
 
-  function gauge(b, s, v, col) {
-    if (C.isBidir(s)) {
-      matrix.barCenter(b, 7, Math.abs(v) / s.max, v >= 0 ? 1 : -1, col);
-    } else {
-      const frac = s.kind === 'soc' ? v / 100 : v / s.max;
-      const overflow = matrix.barLeft(b, 7, frac, col);
-      if (overflow) { // value above its rated max — flag both ends white
-        PF.setPixel(b, 30, 7, C.COLORS.overflow);
-        PF.setPixel(b, 31, 7, C.COLORS.overflow);
-      }
-    }
-  }
-  function drawStat(b, s, big) {
-    const v = C.value(s), col = C.colorOf(s, v);
-    matrix.icon(b, 0, big ? 1 : 0, s.icon, col);
-    PF.drawText(b, 10, big ? 1 : 2, C.fmt(s, v), col);
-    if (big) gauge(b, s, v, col);
-  }
-  function tickerSeg(s) { return s.label + ' ' + C.fmt(s, C.value(s)); }
-
-  function renderStatic() { const b = window.Matrix.blank(); drawStat(b, STATS[stat], false); matrix.paint(b); }
-  function renderGauge()  { const b = window.Matrix.blank(); drawStat(b, STATS[stat], true);  matrix.paint(b); }
+  function renderStatic() { R.renderInto(matrix, STATS[stat], false); }
+  function renderGauge()  { R.renderInto(matrix, STATS[stat], true);  }
   function renderTicker() {
     const b = window.Matrix.blank();
     let x = tickOff, total = 0;
-    for (const s of STATS) { const v = C.value(s); x = PF.drawText(b, x, 2, tickerSeg(s), C.colorOf(s, v)) + 6; }
-    for (const s of STATS) total += PF.textWidth(tickerSeg(s)) + 6;
+    for (const s of STATS) { const v = C.value(s); x = PF.drawText(b, x, 2, R.tickerSegment(s), C.colorOf(s, v)) + 6; }
+    for (const s of STATS) total += PF.textWidth(R.tickerSegment(s)) + 6;
     matrix.paint(b);
     tickOff--; if (tickOff < -total) tickOff = 32;
   }

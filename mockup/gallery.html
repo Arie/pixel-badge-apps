@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pixel Energy — contact sheet</title>
+  <link rel="stylesheet" href="./sim.css">
+  <style>
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin: 8px 0 26px; }
+    .tile .matrix { width: 256px; height: 72px; }   /* 8px per LED */
+    .tile .cap { font-size: 11px; color: #8a97a6; margin-top: 5px; }
+    h2 { font-size: 14px; color: #cfe3ff; margin: 22px 0 4px; text-transform: uppercase; letter-spacing: .08em; }
+    .note { color: #8a97a6; font-size: 12px; margin: 0 0 10px; }
+  </style>
+</head>
+<body>
+  <h1>Pixel energy — contact sheet (every icon &amp; stat, 8px/LED)</h1>
+  <p class="subtitle">All renders at once so we can fix alignment &amp; icons. Each tile is a 32×8 panel scaled 8×.</p>
+
+  <h2>Icons</h2>
+  <p class="note">Icon at x=0 (8×8) with its name in the 3×5 font at x=11 — check vertical centering &amp; icon shape.</p>
+  <div class="grid" id="icons"></div>
+
+  <h2>Static / Rotate (icon + value, no bar)</h2>
+  <p class="note">Value text baseline sits at row 2. Check icon-vs-text alignment and spacing.</p>
+  <div class="grid" id="static"></div>
+
+  <h2>Gauge (icon + value + scaled bar at row 7)</h2>
+  <div class="grid" id="gauge"></div>
+
+  <h2>Gauge edge cases</h2>
+  <p class="note">Overflow tip, full-scale, bidirectional extremes, low SOC.</p>
+  <div class="grid" id="edges"></div>
+
+  <script src="./pixelfont.js"></script>
+  <script src="./matrix.js"></script>
+  <script src="./stats.js"></script>
+  <script src="./render.js"></script>
+  <script src="./gallery.js"></script>
+</body>
+</html>
