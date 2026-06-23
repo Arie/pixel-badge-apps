@@ -37,7 +37,7 @@
     { id: 'USE',  label: 'USE',  icon: 'HOME', kind: 'use',  color: COLORS.consumption, max: MAX.USE },
     { id: 'SOL',  label: 'SOL',  icon: 'SUN',  kind: 'power', color: COLORS.solar, max: MAX.SOL, sample: 3284, hideIdle: true },
     { id: 'SELF', label: 'SELF', icon: 'SELF', kind: 'self',  color: COLORS.self,  max: MAX.SELF },
-    { id: 'GRID', label: 'GRID', icon: 'GRID', kind: 'grid',  maxPos: MAX.GRID_IMPORT, maxNeg: MAX.GRID_EXPORT, sample: -2761 },
+    { id: 'GRID', label: 'GRID', icon: 'GRID', kind: 'grid',  maxPos: MAX.GRID_IMPORT, maxNeg: MAX.GRID_EXPORT, sample: -984 },
     { id: 'HW1',  label: 'HW1',  kind: 'battery', powerMax: MAX.HW_POWER,  weight: 1, socMin: 0,  sampleSoc: 78, samplePower: 250 },
     { id: 'HW2',  label: 'HW2',  kind: 'battery', powerMax: MAX.HW_POWER,  weight: 1, socMin: 0,  sampleSoc: 100, samplePower: 0 },  // idle/full → hidden
     { id: 'ZEN',  label: 'ZEN',  kind: 'battery', powerMax: MAX.ZEN_POWER, weight: 3, socMin: 10, sampleSoc: 41, samplePower: 600 }  // 3x capacity; empty at 10%
@@ -76,9 +76,9 @@
   }
 
   // ---- derivation (mockup sample values mirror the on-device formula) --------
-  const SAMPLE = { solar: 3284, grid: -2761, batteries: 250 - 180 + 600 };
+  const SAMPLE = { solar: 3284, grid: -984, batteries: 250 + 0 + 600 };
   function value(stat) {
-    if (stat.kind === 'use')  return SAMPLE.solar + SAMPLE.grid + SAMPLE.batteries;
+    if (stat.kind === 'use')  return SAMPLE.solar + SAMPLE.grid - SAMPLE.batteries;
     if (stat.kind === 'self') return SAMPLE.solar - Math.max(0, -SAMPLE.grid);
     if (stat.kind === 'battery') return stat.sampleSoc;
     return stat.sample;

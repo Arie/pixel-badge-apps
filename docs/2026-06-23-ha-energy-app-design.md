@@ -51,12 +51,12 @@ Cycled with LEFT/RIGHT (10 stats). Short ≤4-char on-matrix tag.
 **Sign conventions (confirmed live where possible):**
 - `GRID` (`homewizard_p1_vermogen`): **negative = export, positive = import**
   (was −2761 W while solar 3284 W → exporting). Matches the green/purple logic.
-- `batpower`: **positive = charging, negative = discharging** — *assumed; validate
-  against `plug_in_battery_power` / `zendure_signed_power` when a battery is active.*
+- `batpower`: **positive = charging, negative = discharging** — confirmed live
+  (`zendure_signed_power` = −589 W while discharging).
 
 **Derivations (on-badge, per the user's decision to derive rather than add HA
 template sensors):**
-- `USE`  = `SOL` + `GRID` + (`HW1p` + `HW2p` + `ZENp`)  — signed sum, "into-house".
+- `USE`  = `SOL` + `GRID` − (`HW1p` + `HW2p` + `ZENp`)  — battery +=charge draws, −=discharge supplies.
 - `SELF` = `SOL` − max(0, −`GRID`)  — solar not exported.
 
 ## 5. Colors (HomeWizard-inspired, brightened for LEDs)

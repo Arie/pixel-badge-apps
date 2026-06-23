@@ -136,8 +136,9 @@ def bar_right(y, frac, color):
 def value_of(s):
     k = s['kind']
     if k == 'use':
-        return (VALUES.get('SOL', 0) + VALUES.get('GRID', 0) +
-                VALUES.get('HW1P', 0) + VALUES.get('HW2P', 0) + VALUES.get('ZENP', 0))
+        # house load = solar + grid − battery power (battery +=charge draws, −=discharge supplies)
+        return (VALUES.get('SOL', 0) + VALUES.get('GRID', 0) -
+                VALUES.get('HW1P', 0) - VALUES.get('HW2P', 0) - VALUES.get('ZENP', 0))
     if k == 'self':
         g = VALUES.get('GRID', 0)
         return VALUES.get('SOL', 0) - (-g if g < 0 else 0)
