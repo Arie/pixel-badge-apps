@@ -8,149 +8,126 @@
 
 A badge app that shows live energy data from the user's Home Assistant
 (`http://192.168.1.9:8123`) on the badge's 32×8 RGB LED matrix: power flows
-(consumption, solar, self-use, grid) and the state-of-charge of three home
-batteries. The user navigates between presentation styles and individual stats
-with the badge's 4-way button.
+(consumption, solar, self-use, grid) and the state-of-charge **and power** of
+three home batteries. The user navigates presentation styles and individual
+stats with the badge's 4-way button.
 
 ## 2. Hardware & platform constraints
 
-- **Display:** HUB75 RGB LED matrix, **32×8 pixels** (`CONFIG_HUB75_WIDTH=32`,
-  `CONFIG_HUB75_HEIGHT=8`). ~5 characters of static text in the small font.
-- **Graphics API:** firmware `rgb` module — `rgb.clear()`, `rgb.text(text,(r,g,b),(x,y))`,
-  `rgb.scrolltext(text,(r,g,b))`, `rgb.pixel((r,g,b),(x,y))`, `rgb.image(data,(x,y),(w,h))`,
-  `rgb.brightness(1..30)`, `rgb.framerate(1..30)`.
-- **Input:** `buttons` module — `buttons.register(defines.BTN_*, cb)` for
-  `BTN_UP/DOWN/LEFT/RIGHT/A/B`.
-- **Networking:** `wifi` module + `urequests` (supports custom headers). HA is
-  plain **HTTP** on the LAN, so there is **no TLS cert problem** (unlike the
-  badge's OTA — see the firmware notes).
-- **App install location:** `apps/<slug>/` on the badge FAT filesystem, with
-  `__init__.py`, `metadata.json`, `icon.py`, `version`.
+- **Display:** HUB75 RGB LED matrix, **32×8 pixels**. ~5 characters of static text.
+- **Graphics API:** firmware `rgb` module — `clear()`, `text(text,(r,g,b),(x,y))`,
+  `scrolltext(...)`, `pixel((r,g,b),(x,y))`, `image(...)`, `brightness(1..30)`,
+  `framerate(1..30)`.
+- **Input:** `buttons.register(defines.BTN_*, cb)` for `UP/DOWN/LEFT/RIGHT/A/B`.
+- **Networking:** `wifi` + `urequests` (custom headers). HA is plain **HTTP** on
+  the LAN → **no TLS cert problem** (unlike the badge's broken OTA).
+- **App location:** `apps/ha_energy/` (`__init__.py`, `metadata.json`, `icon.py`, `version`).
 
 ## 3. Data source — Home Assistant REST API
 
-- Base URL: `http://192.168.1.9:8123`
-- Auth: **long-lived access token** sent as `Authorization: Bearer <token>`.
-- Per-entity read: `GET /api/states/<entity_id>` →
-  `{"state":"850","attributes":{...}}`. `state` parsed as float.
-- **Polling:** refresh all configured entities every **10 s** (and once on
-  launch), sequentially, with a short timeout. Last-known values are shown
-  between polls. A failed read marks that stat stale (see error handling).
+- Base: `http://192.168.1.9:8123`, auth `Authorization: Bearer <long-lived-token>`.
+- Read: `GET /api/states/<entity_id>` → `{"state":"...","attributes":{...}}`.
+- **Poll** all configured entities every **10 s** (and once on launch),
+  sequentially, short timeout. Last-known values shown between polls.
+- Connectivity verified live 2026-06-23 (HTTP 200; values below are real samples).
 
-## 4. Stats (short tags) and entity mapping
+## 4. Stats, entities, and derivation
 
-Stats are cycled with LEFT/RIGHT. Each has a short ≤4-char on-matrix tag.
+Cycled with LEFT/RIGHT (10 stats). Short ≤4-char on-matrix tag.
 
-| Tag    | Meaning                         | Kind   | HA entity_id (TO PROVIDE) |
-|--------|---------------------------------|--------|---------------------------|
-| `USE`  | House power consumption         | power  | _tbd_                     |
-| `SOL`  | Solar generation                | power  | _tbd_                     |
-| `SELF` | Self-consumption (solar used)   | power  | _tbd_ (may be derived)    |
-| `GRID` | Grid power, signed              | grid   | _tbd_                     |
-| `HW1`  | HomeWizard Plug-In Battery 1 SOC| soc    | _tbd_                     |
-| `HW2`  | HomeWizard Plug-In Battery 2 SOC| soc    | _tbd_                     |
-| `ZEN`  | Zendure AC2400+ SOC             | soc    | _tbd_                     |
+| Tag    | Meaning                  | Kind     | HA entity / formula | Sample |
+|--------|--------------------------|----------|---------------------|--------|
+| `USE`  | House consumption        | use      | **derived** (below) | ~523 W |
+| `SOL`  | Solar generation         | power    | `sensor.solaredge_se6k_ac_power` | 3284 W |
+| `SELF` | Self-consumption         | self     | **derived** (below) | ~523 W |
+| `GRID` | Grid power (signed)      | grid     | `sensor.homewizard_p1_vermogen`  | −2761 W |
+| `HW1`  | HomeWizard battery 1 SOC | soc      | `sensor.plug_in_battery_state_of_charge`   | 100 % |
+| `HW1`  | HomeWizard battery 1 power | batpower | `sensor.plug_in_battery_power`           | 0 W |
+| `HW2`  | HomeWizard battery 2 SOC | soc      | `sensor.plug_in_battery_state_of_charge_2` | 100 % |
+| `HW2`  | HomeWizard battery 2 power | batpower | `sensor.plug_in_battery_power_2`         | 0 W |
+| `ZEN`  | Zendure AC2400+ SOC      | soc      | `sensor.zendure_2400_ac_laadpercentage`  | 100 % |
+| `ZEN`  | Zendure AC2400+ power   | batpower | `sensor.zendure_signed_power`            | 0 W |
 
-**Kinds:**
-- `power` — value in W; `>=1000` shown as `x.xK`. Single fixed color.
-- `grid` — signed W; **negative = export**, **positive = import**. `-`/`+` prefix.
-- `soc` — integer %; color by level.
+**Sign conventions (confirmed live where possible):**
+- `GRID` (`homewizard_p1_vermogen`): **negative = export, positive = import**
+  (was −2761 W while solar 3284 W → exporting). Matches the green/purple logic.
+- `batpower`: **positive = charging, negative = discharging** — *assumed; validate
+  against `plug_in_battery_power` / `zendure_signed_power` when a battery is active.*
 
-## 5. Color scheme (HomeWizard-inspired)
+**Derivations (on-badge, per the user's decision to derive rather than add HA
+template sensors):**
+- `USE`  = `SOL` + `GRID` + (`HW1p` + `HW2p` + `ZENp`)  — signed sum, "into-house".
+- `SELF` = `SOL` − max(0, −`GRID`)  — solar not exported.
 
-Brightened so it reads on LEDs (dark purple renders dim on a raw matrix).
+## 5. Colors (HomeWizard-inspired, brightened for LEDs)
 
-| Role                         | Color        | Hex       |
-|------------------------------|--------------|-----------|
-| Consumption (`USE`)          | purple       | `#7b3ff2` |
-| Solar (`SOL`) / grid export  | green        | `#33d96f` |
-| Self-use (`SELF`)            | light blue   | `#4fc3ff` |
-| Grid import (`GRID` +)       | purple       | `#7b3ff2` |
-| Grid export (`GRID` −)       | green        | `#33d96f` |
-| Battery SOC ≥ 50%            | green        | `#33d96f` |
-| Battery SOC 20–50%           | amber        | `#ff9d3a` |
-| Battery SOC < 20%            | red          | `#ff4d4d` |
+| Role                         | Hex       |
+|------------------------------|-----------|
+| Consumption / grid import    | `#7b3ff2` purple |
+| Solar / grid export / charging | `#33d96f` green |
+| Self-use                     | `#4fc3ff` light blue |
+| Battery discharging          | `#ff9d3a` amber |
+| Overflow (value > rated max) | `#ffffff` white |
+| Battery SOC ≥50 / 20–50 / <20 % | green / amber / red |
 
-## 6. Display modes (UP/DOWN to switch)
+## 6. Gauges & maxima (constants)
 
-1. **Rotate** — hands-free slideshow: icon + value for one stat, auto-advancing
-   through the stat list (~2.5 s each). LEFT/RIGHT steps manually.
-2. **Ticker** — continuous left-scrolling marquee of all stats in one pass
-   (`USE 850W  SOL 2.1K  …`), each segment in its stat color. Matches the
-   countdown app's scroll feel.
-3. **Gauge** — focused single stat: icon + value + a bottom bar whose length
-   encodes magnitude (% for SOC, scaled W for power). Grid uses signed color.
+Gauge mode draws a bottom bar scaled to a per-stat full-scale maximum.
 
-## 7. Navigation
+| Stat            | Max (full-scale) | Bar style |
+|-----------------|------------------|-----------|
+| `USE`           | **17 250 W** (grid connection rating) | left→right; **>max ⇒ white overflow tip** (solar+battery boosting beyond the connection) |
+| `SOL` / `SELF`  | **6 000 W** (solar inverter)          | left→right |
+| `GRID`          | **17 250 W**                          | bidirectional centre-out: export ← / import → |
+| `HW1`/`HW2` power | **±800 W** each way                 | bidirectional: charge → / discharge ← |
+| `ZEN` power     | **±2 400 W** each way                 | bidirectional |
+| any `soc`       | 100 %                                 | left→right, colour by level |
 
-- **UP / DOWN** — previous / next **mode** (wraps).
-- **LEFT / RIGHT** — previous / next **stat** (wraps).
-- **B** — exit app (back to launcher), matching other apps.
-- **A** — reserved (future: toggle brightness or pin a stat).
+`GRID` max is assumed equal to the connection rating (17 250 W) — confirm.
 
-## 8. Configuration & secrets
+## 7. Display modes (UP/DOWN)
 
-- Token + entity IDs live in `apps/ha_energy/config.json` on the badge,
-  **never committed**. Repo ships `app/config.example.json`.
-- Shape:
-  ```json
-  {
-    "base_url": "http://192.168.1.9:8123",
-    "token": "<long-lived-access-token>",
-    "poll_seconds": 10,
-    "stats": [
-      {"id":"USE","entity":"sensor.house_power"},
-      {"id":"SOL","entity":"sensor.solar_power"},
-      {"id":"SELF","entity":"sensor.self_consumption"},
-      {"id":"GRID","entity":"sensor.grid_power"},
-      {"id":"HW1","entity":"sensor.homewizard_battery_1_soc"},
-      {"id":"HW2","entity":"sensor.homewizard_battery_2_soc"},
-      {"id":"ZEN","entity":"sensor.zendure_ac2400_soc"}
-    ]
-  }
-  ```
+1. **Rotate** — hands-free slideshow: icon + value, auto-advancing (~2.5 s).
+2. **Ticker** — continuous scrolling marquee of all stats, each in its colour.
+3. **Gauge** — icon + value + the scaled bar from §6. (User's favourite.)
 
-## 9. Error handling
+## 8. Navigation
 
-- **No WiFi / connect fails:** show a WiFi icon then an error glyph; retry on a
-  backoff. Do not hard-reboot the badge for transient failures.
-- **HA unreachable / HTTP error:** keep last-known values; show a small stale
-  indicator (e.g., dimmed value) and a `?` when never fetched.
-- **Entity missing / non-numeric state:** that stat shows `--`; others keep working.
+- **UP/DOWN** — prev/next mode (wraps). **LEFT/RIGHT** — prev/next stat (wraps).
+- **B** — exit to launcher. **A** — reserved (future).
 
-## 10. App structure (on-badge)
+## 9. Configuration & secrets
+
+- `~/Projects/pixel-badge-apps/.ha-token` holds the long-lived token (gitignored).
+- On-badge: `apps/ha_energy/config.json` (gitignored) holds token + entity map +
+  maxima + poll interval. Repo ships `app/config.example.json`.
+
+## 10. Error handling
+
+- No WiFi / connect fails: WiFi-then-error glyph, retry with backoff, **no reboot**.
+- HA unreachable / HTTP error: keep last-known values, dim/`?` indicator.
+- Missing entity / non-numeric: that stat shows `--`; others keep working.
+
+## 11. App & project structure
 
 ```
-apps/ha_energy/
-  __init__.py     # app entry: setup, button handlers, poll loop, render loop
-  metadata.json   # name "HA Energy", category "event_related"/"system", revision
-  icon.py         # launcher icon (8x8)
-  version
-  config.json     # user secrets (gitignored, created from example)
+apps/ha_energy/                  # on-badge
+  __init__.py  metadata.json  icon.py  version  config.json(gitignored)
+
+pixel-badge-apps/                # this repo (local git)
+  docs/2026-06-23-ha-energy-app-design.md
+  mockup/  pixelfont.js matrix.js stats.js sim.js sim.css energy-sim.html
+  app/     # the MicroPython app
 ```
 
-Internally the app mirrors the mockup's separation: a small framebuffer +
-font/icon renderer, a stats/config layer, and a controller that maps buttons to
-mode/stat and renders. The firmware `rgb` calls replace the browser DOM matrix.
-
-## 11. Project structure (this repo: `pixel-badge-apps`)
-
-```
-pixel-badge-apps/
-  docs/2026-06-23-ha-energy-app-design.md   # this doc
-  mockup/         # browser simulator (design tool): pixelfont/matrix/stats/sim + html/css
-  app/            # the MicroPython badge app (ha_energy)
-```
-
-The **mockup** is the design surface: `stats.js` is the single source of truth
-for tags/colors/kinds and is kept in sync with the on-device config.
+The mockup mirrors the device split: framebuffer + font/icon renderer
+(`pixelfont`/`matrix`), config/maxima/derivation (`stats`), controller (`sim`).
+`stats.js` is the single source of truth and tracks the on-device config.
 
 ## 12. Open questions / to provide
 
-- HA **long-lived access token**.
-- Exact **entity IDs** for the 7 stats (and whether SELF and GRID exist as
-  sensors or must be derived from others).
-- Confirm **battery SOC color-by-level** thresholds (50 / 20%) vs. a fixed color.
-- Confirm whether **GRID** (signed import/export) and **SELF** stay in the list.
-- Default **mode** on launch (proposed: Rotate) and default **brightness**
-  (proposed: 10/30).
+- Confirm **`batpower` sign** (charge vs discharge) once a battery is active.
+- Confirm **`GRID` gauge max** (assumed 17 250 W).
+- Default **mode** on launch (proposed Rotate) and **brightness** (proposed 10/30).
+- Whether 10 stats is the right granularity, or batteries should be composite
+  (SOC + power on one screen).

@@ -1,6 +1,5 @@
-// stats.js — display config and formatting. This is the single source of truth
-// for the mockup and mirrors the on-device app's config shape (short label,
-// icon, color, kind, + later: HA entity_id).
+// stats.js — display config, maxima, and formatting. Single source of truth for
+// the mockup; mirrors the on-device app's config + derivation.
 (function (global) {
   // HomeWizard-inspired palette, brightened so it reads on real LEDs.
   const COLORS = {
@@ -8,38 +7,67 @@
     solar:       '#33d96f', // green
     export:      '#33d96f', // green (back to grid)
     self:        '#4fc3ff', // light blue
-    socHigh:     '#33d96f', // >= 50%
-    socMid:      '#ff9d3a', // 20-50%
-    socLow:      '#ff4d4d'  // < 20%
+    charge:      '#33d96f', // battery charging (power in)
+    discharge:   '#ff9d3a', // battery discharging (power out)
+    overflow:    '#ffffff', // value above its rated maximum
+    socHigh:     '#33d96f', socMid: '#ff9d3a', socLow: '#ff4d4d'
+  };
+
+  // Gauge maxima (W) — full-scale value for each bar. Tuned to the install.
+  const MAX = {
+    USE:  17250, // home grid connection rated power; > this = solar+battery boost
+    SOL:  6000,  // solar inverter rated power
+    SELF: 6000,  // bounded by solar
+    GRID: 17250, // grid connection rating (assumption — confirm)
+    HW_POWER:  800,  // HomeWizard plug-in battery, each way
+    ZEN_POWER: 2400, // Zendure AC2400+, each way
+    SOC: 100
   };
 
   const MODES = ['Rotate', 'Ticker', 'Gauge'];
 
-  // kind: 'power' (W, one color), 'grid' (signed: -export green / +import purple),
-  //       'soc' (%, color by level). label is the SHORT on-matrix tag.
+  // kinds:
+  //   power    — W, unidirectional gauge (left→right), one colour
+  //   use      — derived consumption = solar + grid + Σbattery (purple), can overflow MAX.USE
+  //   self     — derived self-use = solar - export (light blue)
+  //   grid     — signed W, bidirectional gauge: export(green) ↔ import(purple)
+  //   soc      — battery state of charge %, unidirectional 0..100 gauge, colour by level
+  //   batpower — signed battery power, bidirectional gauge: charge(green) ↔ discharge(amber)
   const STATS = [
-    { id: 'USE',   label: 'USE',  icon: 'HOME', kind: 'power', color: COLORS.consumption, sample: 850 },
-    { id: 'SOL',   label: 'SOL',  icon: 'SUN',  kind: 'power', color: COLORS.solar,       sample: 2100 },
-    { id: 'SELF',  label: 'SELF', icon: 'SELF', kind: 'power', color: COLORS.self,        sample: 1450 },
-    { id: 'GRID',  label: 'GRID', icon: 'GRID', kind: 'grid',                              sample: -1250 },
-    { id: 'HW1',   label: 'HW1',  icon: 'BATT', kind: 'soc',                               sample: 78 },
-    { id: 'HW2',   label: 'HW2',  icon: 'BATT', kind: 'soc',                               sample: 64 },
-    { id: 'ZEN',   label: 'ZEN',  icon: 'BATT', kind: 'soc',                               sample: 41 }
+    { id: 'USE',  label: 'USE',  icon: 'HOME', kind: 'use',     color: COLORS.consumption, max: MAX.USE },
+    { id: 'SOL',  label: 'SOL',  icon: 'SUN',  kind: 'power',   color: COLORS.solar, max: MAX.SOL, sample: 3284 },
+    { id: 'SELF', label: 'SELF', icon: 'SELF', kind: 'self',    color: COLORS.self,  max: MAX.SELF },
+    { id: 'GRID', label: 'GRID', icon: 'GRID', kind: 'grid',    max: MAX.GRID, sample: -2761 },
+    { id: 'HW1',  label: 'HW1',  icon: 'BATT', kind: 'soc',      sample: 78 },
+    { id: 'HW1P', label: 'HW1',  icon: 'BOLT', kind: 'batpower', max: MAX.HW_POWER,  sample: 250 },
+    { id: 'HW2',  label: 'HW2',  icon: 'BATT', kind: 'soc',      sample: 64 },
+    { id: 'HW2P', label: 'HW2',  icon: 'BOLT', kind: 'batpower', max: MAX.HW_POWER,  sample: -180 },
+    { id: 'ZEN',  label: 'ZEN',  icon: 'BATT', kind: 'soc',      sample: 41 },
+    { id: 'ZENP', label: 'ZEN',  icon: 'BOLT', kind: 'batpower', max: MAX.ZEN_POWER, sample: 600 }
   ];
 
-  function colorOf(stat, value) {
-    if (stat.kind === 'grid') return value < 0 ? COLORS.export : COLORS.consumption;
-    if (stat.kind === 'soc')  return value >= 50 ? COLORS.socHigh : value >= 20 ? COLORS.socMid : COLORS.socLow;
-    return stat.color;
+  // ---- derivation (mockup sample values mirror the on-device formula) --------
+  const SAMPLE = { solar: 3284, grid: -2761, batteries: 250 - 180 + 600 };
+  function value(stat) {
+    if (stat.kind === 'use')  return SAMPLE.solar + SAMPLE.grid + SAMPLE.batteries;
+    if (stat.kind === 'self') return SAMPLE.solar - Math.max(0, -SAMPLE.grid);
+    return stat.sample;
   }
 
-  // Compact value text for a 32px-wide matrix.
-  function format(stat, value) {
-    if (stat.kind === 'soc') return value + '%';
-    const a = Math.abs(value);
-    const sign = stat.kind === 'grid' ? (value < 0 ? '-' : '+') : '';
+  function colorOf(stat, v) {
+    if (stat.kind === 'grid')     return v < 0 ? COLORS.export : COLORS.consumption;
+    if (stat.kind === 'soc')      return v >= 50 ? COLORS.socHigh : v >= 20 ? COLORS.socMid : COLORS.socLow;
+    if (stat.kind === 'batpower') return v >= 0 ? COLORS.charge : COLORS.discharge;
+    return stat.color;
+  }
+  function isSigned(stat) { return stat.kind === 'grid' || stat.kind === 'batpower'; }
+  function isBidir(stat)  { return stat.kind === 'grid' || stat.kind === 'batpower'; }
+
+  function fmt(stat, v) {
+    if (stat.kind === 'soc') return v + '%';
+    const a = Math.abs(v), sign = isSigned(stat) ? (v < 0 ? '-' : '+') : '';
     return a >= 1000 ? sign + (a / 1000).toFixed(1) + 'K' : sign + a + 'W';
   }
 
-  global.EnergyConfig = { COLORS, MODES, STATS, colorOf, format };
+  global.EnergyConfig = { COLORS, MAX, MODES, STATS, value, colorOf, isSigned, isBidir, fmt };
 })(window);

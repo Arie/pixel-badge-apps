@@ -7,7 +7,8 @@
     HOME: ["   #    ","  ###   "," ##### #","#######.","# ### # ","# ### # ","# ### # ","        "],
     BATT: ["        "," ###### ","##    ##","##    ##","##    ##"," ###### ","        ","        "],
     GRID: ["  ###   "," #   #  ","  ###   ","   #    ","  # #   "," #   #  ","#     # ","        "],
-    SELF: ["   #    ","  ###   "," # # #  ","#######.","#  #  # ","#  #  # ","#######.","        "]
+    SELF: ["   #    ","  ###   "," # # #  ","#######.","#  #  # ","#  #  # ","#######.","        "],
+    BOLT: ["   ##   ","  ##    "," ####   ","   ##   ","  ##    "," #      ","        ","        "]
   };
 
   class Matrix {
@@ -35,6 +36,20 @@
     }
     bar(buf, x, y, len, color) {
       for (let i = 0; i < len; i++) window.PixelFont.setPixel(buf, x + i, y, color);
+    }
+    // Unidirectional bar from the left; fills `frac` (0..1) of the 30px track.
+    // Returns true if frac>1 (overflow).
+    barLeft(buf, y, frac, color) {
+      const n = Math.min(30, Math.round(frac * 30));
+      for (let i = 0; i < n; i++) window.PixelFont.setPixel(buf, 1 + i, y, color);
+      return frac > 1;
+    }
+    // Bidirectional bar growing from the centre. dir>0 to the right, dir<0 left.
+    barCenter(buf, y, frac, dir, color) {
+      const n = Math.round(Math.min(1, frac) * 15);
+      window.PixelFont.setPixel(buf, dir >= 0 ? 16 : 15, y, color); // centre seed
+      for (let i = 1; i <= n; i++)
+        window.PixelFont.setPixel(buf, dir >= 0 ? 16 + i : 15 - i, y, color);
     }
     paint(buf) {
       for (let y = 0; y < H; y++)
