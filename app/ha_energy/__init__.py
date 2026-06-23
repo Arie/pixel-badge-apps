@@ -61,7 +61,7 @@ ICONS = {
 STATS = [
  {'id':'USE', 'label':'USE', 'icon':'HOME','kind':'use',   'color':PURPLE,'max':17250},
  {'id':'SOL', 'label':'SOL', 'icon':'SUN', 'kind':'power', 'color':GREEN, 'max':6000, 'hideIdle':True},
- {'id':'SELF','label':'SELF','icon':'SELF','kind':'self',  'color':LBLUE, 'max':6000},
+ {'id':'SELF','label':'SELF','icon':'SELF','kind':'self',  'color':LBLUE, 'max':6000, 'hideIdle':True},
  {'id':'GRID','label':'GRID','icon':'GRID','kind':'grid',  'maxPos':17250,'maxNeg':6000},
  {'id':'HW1', 'label':'HW1', 'kind':'battery','socId':'HW1','powerId':'HW1P','weight':1,'socMin':0},
  {'id':'HW2', 'label':'HW2', 'kind':'battery','socId':'HW2','powerId':'HW2P','weight':1,'socMin':0},
