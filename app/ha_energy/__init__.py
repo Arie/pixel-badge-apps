@@ -561,57 +561,76 @@ class Carousel:
     def current(self):
         return self.seq[self._pos()]
 
-def idle_ms(now, touched, overflow):
-    """How long to sleep: snappy just after a press, quicker while blinking."""
-    if time.ticks_diff(now, touched) < 1200:
-        return 50
-    return 120 if overflow else 220
+class Display:
+    """One screen-tick = five small phases. main() just calls step() in a loop."""
+    def __init__(self):
+        self.car = Carousel(active_stats())
+        self.bright = state['bright']
+        self.last_poll = self.last_adv = self.touched = time.ticks_ms()
+        self.dirty = True            # something to (re)draw this tick
+        self.prev_blink = False
+        self.overflow = False
 
-def main():
-    global blink_on
-    rgb.background((0, 0, 0))
-    bright = state['bright']; rgb.brightness(bright)
-    if not wifi.status():
-        wifi.connect(); wifi.wait()
-    if wifi.status():
-        poll()
+    def _brightness(self, now):      # UP/DOWN — applies live, no redraw needed
+        if state['bright'] != self.bright:
+            self.bright = state['bright']
+            rgb.brightness(self.bright)
+            self.touched = now
 
-    car = Carousel(active_stats())
-    last_poll = last_adv = touched = time.ticks_ms()
-    dirty = True
-    prev_blink = False
-    while not state['exit']:
-        now = time.ticks_ms()
+    def _poll(self, now):            # refresh HA readings on the poll interval
+        if wifi.status() and time.ticks_diff(now, self.last_poll) >= POLL_MS:
+            poll()
+            self.last_poll = now
+            self.car.refresh(active_stats())   # the active set can change with new data
+            self.dirty = True
 
-        if state['bright'] != bright:               # UP/DOWN brightness (applies live)
-            bright = state['bright']; rgb.brightness(bright); touched = now
+    def _select(self, now):          # which stat to show (LEFT/RIGHT or auto-advance)
+        if state['nav']:
+            self.car.step(state['nav']); state['nav'] = 0
+            self.last_adv = self.touched = now
+            self.dirty = True
+        elif not state['paused'] and time.ticks_diff(now, self.last_adv) >= 2500:
+            self.car.step(1); self.last_adv = now
+            self.dirty = True
 
-        if wifi.status() and time.ticks_diff(now, last_poll) >= POLL_MS:
-            poll(); last_poll = now                 # new readings...
-            car.refresh(active_stats()); dirty = True   # ...the active set may change here
-
-        if state['nav']:                            # LEFT / RIGHT step
-            car.step(state['nav']); state['nav'] = 0
-            last_adv = touched = now; dirty = True
-        elif not state['paused'] and time.ticks_diff(now, last_adv) >= 2500:
-            car.step(1); last_adv = now; dirty = True   # auto-advance
-
-        cur = car.current()
-        overflow = is_overflow(cur)
+    def _draw(self, now):            # redraw only when the picture changes
+        global blink_on
+        cur = self.car.current()
+        self.overflow = is_overflow(cur)
         blink_on = (now // 450) % 2 == 0
-        if overflow and blink_on != prev_blink:     # animate the overflow blink
-            dirty = True
-        prev_blink = blink_on
-
-        if dirty:                                   # redraw only when the picture changes
+        if self.overflow and blink_on != self.prev_blink:
+            self.dirty = True        # animate the overflow blink
+        self.prev_blink = blink_on
+        if self.dirty:
             try:
                 render(cur)
             except Exception as e:
                 sys.print_exception(e)
-            dirty = False
+            self.dirty = False
 
-        time.sleep_ms(idle_ms(now, touched, overflow))
+    def _idle_ms(self, now):         # snappy after a press, quicker while blinking
+        if time.ticks_diff(now, self.touched) < 1200:
+            return 50
+        return 120 if self.overflow else 220
 
+    def step(self):
+        now = time.ticks_ms()
+        self._brightness(now)
+        self._poll(now)
+        self._select(now)
+        self._draw(now)
+        time.sleep_ms(self._idle_ms(now))
+
+def main():
+    rgb.background((0, 0, 0))
+    rgb.brightness(state['bright'])
+    if not wifi.status():
+        wifi.connect(); wifi.wait()
+    if wifi.status():
+        poll()
+    display = Display()
+    while not state['exit']:
+        display.step()
     rgb.clear()
     system.home()
 
