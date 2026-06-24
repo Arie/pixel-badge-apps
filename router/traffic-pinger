@@ -1,32 +1,39 @@
 #!/bin/sh
 # traffic-pinger — per-WAN latency ring-buffer daemon for the net_traffic CGI v2.
 # Runs as a persistent daemon (managed by procd). For each WAN interface defined in
-# /etc/traffic.conf (same format: <iface> <name> <down_mbps> <up_mbps>) it issues
-# "ping -I <iface> -c1 -W1 8.8.8.8" roughly every 0.2 s and keeps the last 32 RTT
-# samples (integers in ms; -1 = loss/timeout) in /tmp/traffic_ping_<iface> as a
-# single space-separated line, newest last.
+# /etc/traffic.conf (<iface> <name> <down_mbps> <up_mbps> [ping_target]) it issues
+# "ping -I <iface> -c1 -W1 <target>" ~5x/sec and keeps the last 32 RTT samples
+# (ms, decimals; -1 = loss/timeout) in /tmp/traffic_ping_<iface>, newest last.
+#
+# The optional 5th field is a per-WAN ping target (default 8.8.8.8). Pointing both
+# WANs at a provider-homed IP makes their graphs diverge by the peering distance —
+# e.g. a KPN IP is on-net for the KPN WAN but a peering hop away for the other.
 #
 # POSIX sh (busybox ash) — no extra packages needed.
 # Install: /usr/bin/traffic-pinger  (managed via /etc/init.d/traffic-pinger)
 
 CONF=/etc/traffic.conf
-TARGET=8.8.8.8
+DEFAULT_TARGET=8.8.8.8
 HIST_LEN=32
 
-# Determine list of WAN ifaces from conf or auto-detect, space-separated.
-get_ifaces() {
+# Emit "<iface> <target>" per WAN from conf, or auto-detect the default-route iface.
+get_targets() {
     if [ -f "$CONF" ]; then
-        grep -vE '^[[:space:]]*(#|$)' "$CONF" | awk '{print $1}' | tr '\n' ' '
+        grep -vE '^[[:space:]]*(#|$)' "$CONF" | while read -r iface name dmax umax target rest; do
+            [ -z "$iface" ] && continue
+            [ -z "$target" ] && target="$DEFAULT_TARGET"
+            echo "$iface $target"
+        done
     else
-        ip route get "$TARGET" 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -1
+        dev=$(ip route get "$DEFAULT_TARGET" 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -1)
+        [ -n "$dev" ] && echo "$dev $DEFAULT_TARGET"
     fi
 }
 
-# Ping once on iface; echo RTT int (ms) or -1.
+# Ping once on iface to target; echo RTT (ms, decimals) or -1.
 ping_once() {
-    local iface="$1"
-    local out rtt
-    out=$(ping -I "$iface" -c1 -W1 "$TARGET" 2>/dev/null)
+    local iface="$1" target="$2" out rtt
+    out=$(ping -4 -I "$iface" -c1 -W1 "$target" 2>/dev/null)
     rtt=$(printf '%s\n' "$out" | sed -n 's/.*time=\([0-9.]*\).*/\1/p' | head -1)
     if [ -n "$rtt" ]; then
         printf '%s' "$rtt"
@@ -62,20 +69,20 @@ update_ring() {
 
 # Main loop — runs forever, cycling through WANs.
 while true; do
-    ifaces=$(get_ifaces)
-    if [ -z "$ifaces" ]; then
+    targets=$(get_targets)
+    if [ -z "$targets" ]; then
         sleep 1
         continue
     fi
-    # shellcheck disable=SC2086
-    for iface in $ifaces; do
-        # ~5 samples/sec to match the badge's ping_rate. A flat-out loop on a fast
-        # link emits dozens/sec and outruns the badge's play-head; pace it here.
-        # (busybox has no sub-second sleep, so emit 5 then sleep 1 — bursty, but the
-        # badge's jitter buffer absorbs it.)
+    # ~5 samples/sec/WAN to match the badge's ping_rate. A flat-out loop on a fast
+    # link emits dozens/sec and outruns the badge's play-head; pace it here (5 then
+    # sleep 1 — bursty, but the badge's jitter buffer absorbs it, and the back-to-
+    # back burst captures GPON-style micro-jitter that 1s sampling would smooth).
+    echo "$targets" | while read -r iface target; do
+        [ -z "$iface" ] && continue
         k=0
         while [ "$k" -lt 5 ]; do
-            rtt=$(ping_once "$iface")
+            rtt=$(ping_once "$iface" "$target")
             update_ring "$iface" "$rtt"
             k=$((k + 1))
         done

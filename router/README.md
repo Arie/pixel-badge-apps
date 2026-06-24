@@ -46,12 +46,19 @@ are rendered as a gap/loss indicator.
 
 ## Configure the WAN list
 
-Create `/etc/traffic.conf`, one WAN per line — `<iface> <name> <down_mbps> <up_mbps>`:
+Create `/etc/traffic.conf`, one WAN per line —
+`<iface> <name> <down_mbps> <up_mbps> [ping_target]`:
 
 ```
-pppoe-ppp0 WAN1 1000 1000
-eth3       WAN2 500  500
+pppoe-ppp0 WAN1 1000 1000 185.93.175.46
+pppoe-ppp1 WAN2 1000 1000 185.93.175.46
 ```
+
+The optional 5th field is a per-WAN **ping target** (default `8.8.8.8`, pinged with
+`-4`). Pointing both WANs at a provider-homed IP makes their graphs diverge by the
+peering distance — e.g. `freedom.nl` (185.93.175.46) is on-net for the Freedom WAN
+(~4.2 ms) but a peering hop away via KPN (~5.9 ms), so each WAN's avg-ping overlay
+reads a different number. Use a neutral anchor like `8.8.8.8` for pure link-health.
 
 If absent, the default-route interface is auto-detected as a single `WAN`.
 (WAN ifaces differ per router — dev `pppoe-ppp0`, party `eth3` — so always set this
