@@ -187,7 +187,7 @@ def avg_ping(pings):
             count += 1
     if count == 0:
         return -1
-    return int(round(total / count))
+    return total / count           # float; avg_label rounds for display
 
 def avg_label(a):
     """Return display label for average ping value a.
@@ -198,9 +198,11 @@ def avg_label(a):
     """
     if a < 0:
         return ""
+    if a < 10:
+        return "%.1fMS" % a              # sub-10ms: one decimal (e.g. 4.2MS)
     if a < 100:
-        return "%dMS" % a
-    return "%d" % a
+        return "%dMS" % int(round(a))
+    return "%d" % int(round(a))
 
 def bar_height(v, scale):
     """Return filled-bar height in pixels for a ping RTT value v.

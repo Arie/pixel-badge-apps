@@ -27,7 +27,7 @@ ping_once() {
     local iface="$1"
     local out rtt
     out=$(ping -I "$iface" -c1 -W1 "$TARGET" 2>/dev/null)
-    rtt=$(printf '%s\n' "$out" | sed -n 's/.*time=\([0-9]*\)[^0-9].*/\1/p' | head -1)
+    rtt=$(printf '%s\n' "$out" | sed -n 's/.*time=\([0-9.]*\).*/\1/p' | head -1)
     if [ -n "$rtt" ]; then
         printf '%s' "$rtt"
     else

@@ -304,7 +304,9 @@ def test_avg_ping_empty(net_app):
 
 
 def test_avg_label_single_digit(net_app):
-    assert net_app.avg_label(4) == "4MS"
+    assert net_app.avg_label(4) == "4.0MS"  # sub-10ms shows one decimal
+    assert net_app.avg_label(4.2) == "4.2MS"
+    assert net_app.avg_label(9.9) == "9.9MS"
 
 
 def test_avg_label_two_digits(net_app):
