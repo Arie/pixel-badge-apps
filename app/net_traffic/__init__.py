@@ -26,7 +26,7 @@ DEFAULTS = {
     'poll_seconds': 5,
     'brightness': 10,
     'auto_advance_seconds': 2.5,
-    'ping_scale_ms': 30,    # ping-graph full-height RTT in ms
+    'ping_scale_ms': 50,    # ping-graph full-height RTT in ms (fixed scale)
     'rtt_alert_ms': 100,    # RTT at or above this → alert
     'loss_alert_pct': 5,    # loss% at or above this → alert
 }
@@ -129,15 +129,16 @@ def build_screens(wans, conns):
     return screens
 
 def ping_columns(pings, scale_ms):
-    """Return a list of column ops for the ping sparkline.
+    """Return a list of column ops for the ping sparkline (line/trace mode).
 
-    Each entry is a list of (row, color_key) tuples for one x column.
+    Each entry is a list with ONE (row, color_key) tuple for one x column.
     Columns align so newest ping is rightmost (matching the 32-wide display).
     color_key is 'purple', 'green', 'amber', or 'red' — strings for testability.
 
-    Loss (-1): single purple pixel at row 0 (top). No other pixels.
-    Normal rtt: bar growing from row 7 upward, height = max(1, round(min(rtt,scale_ms)/scale_ms*7)).
-    Row 0 is the loss lane — normal bars are capped at height 7 → row 1 minimum.
+    Loss (-1): single purple pixel at row 0 (top).
+    Normal rtt: level = round(min(rtt, scale_ms) / scale_ms * 6), 0..6.
+                pixel row = 7 - level  (0 ms -> row 7, >=scale_ms -> row 1).
+                Row 0 is reserved for loss only.
     Colors: green if rtt<40, amber if rtt<80, else red.
     """
     result = []
@@ -147,11 +148,9 @@ def ping_columns(pings, scale_ms):
         else:
             rtt = v
             color = 'green' if rtt < 40 else ('amber' if rtt < 80 else 'red')
-            h = max(1, round(min(rtt, scale_ms) / scale_ms * 7))
-            ops = []
-            for row in range(7, 7 - h, -1):
-                ops.append((row, color))
-            result.append(ops)
+            level = round(min(rtt, scale_ms) / scale_ms * 6)
+            row = 7 - level
+            result.append([(row, color)])
     return result
 
 def alert_wan(wans, rtt_alert, loss_alert):
@@ -181,17 +180,6 @@ def avg_ping(pings):
     if count == 0:
         return -1
     return int(round(total / count))
-
-def auto_scale_ms(pings, fallback):
-    """Return a dynamic full-scale value so the average ping sits at mid-height.
-
-    full-scale = max(2 * avg, 10).  Floor of 10 ms avoids over-amplifying
-    near-zero latency.  Falls back to `fallback` when there is no non-loss data.
-    """
-    a = avg_ping(pings)
-    if a > 0:
-        return max(2 * a, 10)
-    return fallback
 
 # ---- poll data storage ------------------------------------------------------
 _data = {'wans': [], 'conns': None, 'stale': True}
@@ -281,7 +269,7 @@ def draw_screen(s):
         # pad so newest is at x=31
         start_x = max(0, W - n)
         visible = pings[max(0, n - W):]
-        scale = auto_scale_ms(pings, cfg['ping_scale_ms'])
+        scale = cfg['ping_scale_ms']
         cols = ping_columns(visible, scale)
         for i, ops in enumerate(cols):
             x = start_x + i

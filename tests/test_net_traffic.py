@@ -132,78 +132,110 @@ def test_build_screens_values(net_app):
     assert down["bps_max"] == 1000000000
 
 
-# ---- ping_columns ------------------------------------------------------------
+# ---- ping_columns (line/trace mode, fixed 50 ms scale) ----------------------
 
 
 def test_ping_columns_loss_gives_purple_at_row0(net_app):
-    cols = net_app.ping_columns([-1], 60)
+    cols = net_app.ping_columns([-1], 50)
     assert len(cols) == 1
     assert cols[0] == [(0, "purple")]
 
 
 def test_ping_columns_loss_only_one_pixel(net_app):
-    # loss: single purple dot at top, no other pixels in that column
-    cols = net_app.ping_columns([-1], 60)
+    # loss: single purple dot at row 0, no other pixels
+    cols = net_app.ping_columns([-1], 50)
     assert len(cols[0]) == 1
 
 
-def test_ping_columns_30ms_at_60_scale(net_app):
-    # height = max(1, round(30/60*7)) = max(1, round(3.5)) = max(1,4) = 4
-    # rows 7,6,5,4 (growing from bottom)
-    cols = net_app.ping_columns([30], 60)
-    assert len(cols) == 1
-    rows = [r for (r, _) in cols[0]]
-    assert 7 in rows  # bottom row always lit
-    assert len(rows) == 4  # 4 pixels high
-    colors = [c for (_, c) in cols[0]]
-    assert all(c == "green" for c in colors)  # 30 < 40 → green
+def test_ping_columns_0ms_at_bottom(net_app):
+    # 0 ms → level=0 → row 7 (bottom)
+    cols = net_app.ping_columns([0], 50)
+    assert len(cols[0]) == 1
+    assert cols[0][0][0] == 7
 
 
-def test_ping_columns_50ms_amber(net_app):
-    # 50ms at scale 60 → height = max(1, round(50/60*7)) = max(1, round(5.8)) = 6
-    cols = net_app.ping_columns([50], 60)
-    colors = [c for (_, c) in cols[0]]
-    assert all(c == "amber" for c in colors)  # 40 <= 50 < 80 → amber
+def test_ping_columns_50ms_at_top(net_app):
+    # 50 ms (== scale) → level=6 → row 1
+    cols = net_app.ping_columns([50], 50)
+    assert len(cols[0]) == 1
+    assert cols[0][0][0] == 1
 
 
-def test_ping_columns_80ms_red(net_app):
-    # 80ms >= 80 → red
-    cols = net_app.ping_columns([80], 60)
-    colors = [c for (_, c) in cols[0]]
-    assert all(c == "red" for c in colors)
+def test_ping_columns_over_scale_capped_at_row1(net_app):
+    # rtt > scale → clamped to scale → row 1, row 0 stays loss lane
+    cols = net_app.ping_columns([200], 50)
+    row = cols[0][0][0]
+    assert row == 1
+    assert row != 0
 
 
-def test_ping_columns_capped_at_7(net_app):
-    # rtt > scale_ms → capped at height 7, row 0 stays the loss lane
-    cols = net_app.ping_columns([200], 60)
-    rows = [r for (r, _) in cols[0]]
-    assert 0 not in rows  # row 0 reserved for loss
-    assert max(rows) == 7
-    assert min(rows) == 1  # can reach row 1 (height=7 → rows 7..1)
+def test_ping_columns_25ms_near_mid(net_app):
+    # 25 ms at scale 50 → level = round(25/50*6) = round(3.0) = 3 → row 4
+    cols = net_app.ping_columns([25], 50)
+    row = cols[0][0][0]
+    assert row == 4
 
 
-def test_ping_columns_min_height_1(net_app):
-    # very low rtt → still at least 1 pixel
-    cols = net_app.ping_columns([1], 60)
-    assert len(cols[0]) >= 1
+def test_ping_columns_one_pixel_per_column(net_app):
+    # line mode: exactly one pixel per column for normal rtt
+    cols = net_app.ping_columns([10, 20, 30], 50)
+    for col in cols:
+        assert len(col) == 1
 
 
-def test_ping_columns_left_pad_newest_right(net_app):
-    # 2 entries → 2 columns, newest (index 1) is at position x=1
-    cols = net_app.ping_columns([10, 20], 60)
+def test_ping_columns_multiple_columns_count(net_app):
+    # 2 entries → 2 columns
+    cols = net_app.ping_columns([10, 20], 50)
     assert len(cols) == 2
 
 
+def test_ping_columns_30ms_green(net_app):
+    # 30 ms < 40 → green
+    cols = net_app.ping_columns([30], 50)
+    assert cols[0][0][1] == "green"
+
+
 def test_ping_columns_39ms_still_green(net_app):
-    cols = net_app.ping_columns([39], 60)
-    colors = [c for (_, c) in cols[0]]
-    assert all(c == "green" for c in colors)
+    cols = net_app.ping_columns([39], 50)
+    assert cols[0][0][1] == "green"
 
 
 def test_ping_columns_40ms_amber(net_app):
-    cols = net_app.ping_columns([40], 60)
-    colors = [c for (_, c) in cols[0]]
-    assert all(c == "amber" for c in colors)
+    cols = net_app.ping_columns([40], 50)
+    assert cols[0][0][1] == "amber"
+
+
+def test_ping_columns_60ms_amber(net_app):
+    # 60 ms: 40 <= 60 < 80 → amber
+    cols = net_app.ping_columns([60], 50)
+    assert cols[0][0][1] == "amber"
+
+
+def test_ping_columns_80ms_red(net_app):
+    # 80 ms >= 80 → red
+    cols = net_app.ping_columns([80], 50)
+    assert cols[0][0][1] == "red"
+
+
+def test_ping_columns_100ms_red(net_app):
+    # 100 ms >= 80 → red
+    cols = net_app.ping_columns([100], 50)
+    assert cols[0][0][1] == "red"
+
+
+def test_ping_columns_fixed_scale_4ms_near_bottom(net_app):
+    # With fixed 50 ms scale, a 4 ms ping should be near the bottom (row 6 or 7)
+    # level = round(4/50*6) = round(0.48) = 0 → row 7
+    cols = net_app.ping_columns([4], 50)
+    row = cols[0][0][0]
+    assert row >= 6, "4 ms should be near the bottom with 50 ms fixed scale, got row %d" % row
+
+
+def test_ping_columns_loss_row0_not_used_by_normal(net_app):
+    # normal rtt never occupies row 0 (reserved for loss)
+    cols = net_app.ping_columns([1, 10, 50, 100], 50)
+    for col in cols:
+        assert col[0][0] != 0
 
 
 # ---- alert_wan ---------------------------------------------------------------
@@ -266,40 +298,3 @@ def test_avg_ping_all_loss(net_app):
 
 def test_avg_ping_empty(net_app):
     assert net_app.avg_ping([]) == -1
-
-
-# ---- auto_scale_ms -----------------------------------------------------------
-
-
-def test_auto_scale_ms_average_20(net_app):
-    # avg([20,20,20]) = 20  → max(2*20, 10) = 40
-    assert net_app.auto_scale_ms([20, 20, 20], 30) == 40
-
-
-def test_auto_scale_ms_flat_4(net_app):
-    # avg([4,4,4]) = 4  → max(2*4, 10) = max(8, 10) = 10
-    assert net_app.auto_scale_ms([4, 4, 4], 30) == 10
-
-
-def test_auto_scale_ms_all_loss(net_app):
-    # no non-loss data → returns fallback
-    assert net_app.auto_scale_ms([-1, -1], 30) == 30
-
-
-def test_auto_scale_ms_empty(net_app):
-    # empty list → returns fallback
-    assert net_app.auto_scale_ms([], 30) == 30
-
-
-def test_auto_scale_ms_mixed_losses(net_app):
-    # avg of non-loss only: (10+30)/2 = 20  → max(40, 10) = 40
-    assert net_app.auto_scale_ms([-1, 10, -1, 30], 30) == 40
-
-
-def test_auto_scale_ms_bar_at_mid_height(net_app):
-    # For [4,4,4] auto_scale=10; bar height = max(1, round(4/10*7)) = max(1,3) = 3
-    # Mid-height of 7-px range is 3.5, so height 3 or 4 is acceptable (near middle)
-    scale = net_app.auto_scale_ms([4, 4, 4], 30)  # → 10
-    cols = net_app.ping_columns([4], scale)
-    h = len(cols[0])
-    assert 3 <= h <= 4, "expected bar near mid-height (3-4 px), got %d" % h
