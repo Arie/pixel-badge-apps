@@ -458,7 +458,8 @@ def draw_screen(s):
 def render(s):
     fb_clear()
     draw_screen(s)
-    fb_blit()
+    gc.collect()        # clean heap BEFORE the blit: rgb.clear() blanks the panel, so a
+    fb_blit()           # GC pause between clear and hub75.image() = a visible flicker
 
 def _is_alerting():
     """True if any current WAN is in alert state."""
