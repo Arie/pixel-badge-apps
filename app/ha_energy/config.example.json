@@ -3,14 +3,15 @@
   "token": "PASTE_LONG_LIVED_ACCESS_TOKEN_HERE",
   "poll_seconds": 5,
   "brightness": 10,
-  "entities": {
-    "SOL":  "sensor.solaredge_se6k_ac_power",
-    "GRID": "sensor.homewizard_p1_vermogen",
-    "HW1":  "sensor.plug_in_battery_state_of_charge",
-    "HW1P": "sensor.plug_in_battery_power",
-    "HW2":  "sensor.plug_in_battery_state_of_charge_2",
-    "HW2P": "sensor.plug_in_battery_power_2",
-    "ZEN":  "sensor.zendure_2400_ac_laadpercentage",
-    "ZENP": "sensor.zendure_signed_power"
-  }
+  "auto_advance_seconds": 2.5,
+  "idle_watts": 10,
+  "grid_connection_w": 17250,
+  "solar_max_w": 6000,
+  "solar_entity": "sensor.your_solar_ac_power",
+  "grid_entity": "sensor.your_p1_power",
+  "batteries": [
+    {"label": "HW1", "soc": "sensor.battery_1_soc", "power": "sensor.battery_1_power", "power_max": 800, "weight": 1, "soc_min": 0},
+    {"label": "HW2", "soc": "sensor.battery_2_soc", "power": "sensor.battery_2_power", "power_max": 800, "weight": 1, "soc_min": 0},
+    {"label": "ZEN", "soc": "sensor.battery_3_soc", "power": "sensor.battery_3_power", "power_max": 2400, "weight": 3, "soc_min": 10}
+  ]
 }

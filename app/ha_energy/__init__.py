@@ -17,17 +17,36 @@ except ImportError:                              # host: the pure logic still im
 
 W, H = 32, 8
 
-# ---- config (token + entity map; gitignored) --------------------------------
+# ---- config ----------------------------------------------------------------
+# DEFAULTS are this install's values; config.json (gitignored) overrides them.
+DEFAULTS = {
+    'base_url': '', 'token': '',
+    'poll_seconds': 5, 'brightness': 10, 'idle_watts': 10, 'auto_advance_seconds': 2.5,
+    'grid_connection_w': 17250,   # USE overflow + GRID import full-scale
+    'solar_max_w': 6000,          # SOL max, USE-bar scale, GRID export full-scale
+    'solar_entity': 'sensor.solaredge_se6k_ac_power',
+    'grid_entity': 'sensor.homewizard_p1_vermogen',
+    'batteries': [
+        {'label': 'HW1', 'soc': 'sensor.plug_in_battery_state_of_charge',   'power': 'sensor.plug_in_battery_power',   'power_max': 800,  'weight': 1, 'soc_min': 0},
+        {'label': 'HW2', 'soc': 'sensor.plug_in_battery_state_of_charge_2', 'power': 'sensor.plug_in_battery_power_2', 'power_max': 800,  'weight': 1, 'soc_min': 0},
+        {'label': 'ZEN', 'soc': 'sensor.zendure_2400_ac_laadpercentage',   'power': 'sensor.zendure_signed_power',    'power_max': 2400, 'weight': 3, 'soc_min': 10},
+    ],
+}
 try:
     with open('apps/ha_energy/config.json') as f:
         CFG = json.load(f)
-except OSError:                                  # absent off-device; pure logic doesn't need it
+except OSError:                                  # absent off-device; defaults stand in
     CFG = {}
-BASE = CFG.get('base_url', '')
-POLL_MS = int(CFG.get('poll_seconds', 5)) * 1000
-ENTITIES = CFG.get('entities', {})               # id -> HA entity_id
-HEADERS = {'Authorization': 'Bearer ' + CFG.get('token', '')}
-IDLE_W = 10                                       # |power| below this = idle
+cfg = dict(DEFAULTS)
+cfg.update(CFG)                                  # config.json wins, key by key
+
+BASE = cfg['base_url']
+HEADERS = {'Authorization': 'Bearer ' + cfg['token']}
+POLL_MS = int(cfg['poll_seconds']) * 1000
+ADV_MS = int(cfg['auto_advance_seconds'] * 1000)
+IDLE_W = cfg['idle_watts']                        # |power| below this = idle
+USE_SCALE = cfg['solar_max_w']                    # USE bar full-scale
+GRID_MAX = cfg['grid_connection_w']               # USE boost-overflow threshold
 
 # ---- colours (tuned on the panel) -------------------------------------------
 PURPLE = (0x55, 0x18, 0xcc)   # consumption / import / battery charging
@@ -297,16 +316,24 @@ ICONS = {ch: _glyph(a) for ch, a in {
 ...##...""",
 }.items()}
 
-# ---- stats (entities come from config) --------------------------------------
-STATS = [
- {'id':'USE', 'label':'USE', 'icon':'HOME','kind':'use',   'color':PURPLE,'max':17250},
- {'id':'SOL', 'label':'SOL', 'icon':'SUN', 'kind':'power', 'color':GREEN, 'max':6000, 'hideIdle':True},
- {'id':'SELF','label':'SELF','icon':'SELF','kind':'self',  'color':LBLUE, 'max':6000, 'hideIdle':True},
- {'id':'GRID','label':'GRID','icon':'GRID','kind':'grid',  'maxPos':17250,'maxNeg':6000},
- {'id':'HW1', 'label':'HW1', 'kind':'battery','socId':'HW1','powerId':'HW1P','weight':1,'socMin':0},
- {'id':'HW2', 'label':'HW2', 'kind':'battery','socId':'HW2','powerId':'HW2P','weight':1,'socMin':0},
- {'id':'ZEN', 'label':'ZEN', 'kind':'battery','socId':'ZEN','powerId':'ZENP','weight':3,'socMin':10},
-]
+# ---- stats (built from config; DEFAULTS reproduce this install exactly) ------
+def _build_stats(c):
+    bats, entities, pids = [], {'SOL': c['solar_entity'], 'GRID': c['grid_entity']}, []
+    for bc in c['batteries']:
+        label = bc['label']; pid = label + 'P'
+        bats.append({'id':label, 'label':label, 'kind':'battery',
+                     'socId':label, 'powerId':pid, 'powerMax':bc.get('power_max', 800),
+                     'weight':bc.get('weight', 1), 'socMin':bc.get('soc_min', 0)})
+        entities[label] = bc['soc']; entities[pid] = bc['power']; pids.append(pid)
+    flow = [
+     {'id':'USE', 'label':'USE', 'icon':'HOME','kind':'use',   'color':PURPLE,'max':c['grid_connection_w']},
+     {'id':'SOL', 'label':'SOL', 'icon':'SUN', 'kind':'power', 'color':GREEN, 'max':c['solar_max_w'], 'hideIdle':True},
+     {'id':'SELF','label':'SELF','icon':'SELF','kind':'self',  'color':LBLUE, 'max':c['solar_max_w'], 'hideIdle':True},
+     {'id':'GRID','label':'GRID','icon':'GRID','kind':'grid',  'maxPos':c['grid_connection_w'],'maxNeg':c['solar_max_w']},
+    ]
+    return flow + bats, entities, pids
+
+STATS, ENTITIES, BAT_POWER_IDS = _build_stats(cfg)
 BATSUM = {'kind':'batsummary', 'id':'BAT'}
 VALUES = {}     # id -> float (raw HA readings)
 
@@ -372,9 +399,11 @@ def bar_left(y, frac, color):
 def value_of(s):
     k = s['kind']
     if k == 'use':
-        # house load = solar + grid − battery power (battery +=charge draws, −=discharge supplies)
-        return (VALUES.get('SOL', 0) + VALUES.get('GRID', 0) -
-                VALUES.get('HW1P', 0) - VALUES.get('HW2P', 0) - VALUES.get('ZENP', 0))
+        # house load = solar + grid − Σ battery power (+ charge draws, − discharge supplies)
+        total = VALUES.get('SOL', 0) + VALUES.get('GRID', 0)
+        for p in BAT_POWER_IDS:
+            total -= VALUES.get(p, 0)
+        return total
     if k == 'self':
         g = VALUES.get('GRID', 0)
         sv = VALUES.get('SOL', 0) - (-g if g < 0 else 0)   # solar minus solar-exported
@@ -438,8 +467,6 @@ def gauge(s, v, col):
     else:
         bar_left(7, frac, col)      # always from the left; colour shows the sign
 
-USE_SCALE = 6000        # USE bar full-scale (solar inverter max); above this it just fills
-
 def use_segments(usage, solar):
     """Split into (self-use, grid-import, export) watts: solar used at home,
     the rest of usage drawn from the grid, and any solar beyond usage exported."""
@@ -447,7 +474,7 @@ def use_segments(usage, solar):
     return (self_w, usage - self_w, solar - self_w)
 
 def draw_use_bar(usage):
-    if usage > 17250:                          # boost beyond the grid connection
+    if usage > GRID_MAX:                        # boost beyond the grid connection
         if blink_on:
             bar_left(7, 1.0, ALERT)
         return
@@ -611,7 +638,7 @@ class Display:
             self.car.step(state['nav']); state['nav'] = 0
             self.last_adv = self.touched = now
             self.dirty = True
-        elif not state['paused'] and time.ticks_diff(now, self.last_adv) >= 2500:
+        elif not state['paused'] and time.ticks_diff(now, self.last_adv) >= ADV_MS:
             self.car.step(1); self.last_adv = now
             self.dirty = True
 
