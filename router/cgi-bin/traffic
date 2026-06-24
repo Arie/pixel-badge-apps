@@ -103,11 +103,16 @@ wan_lines | while read -r iface name dmax umax _rest; do
     rtt_ms=$(echo "$ping_stats" | awk '{print $2}')
     loss_pct=$(echo "$ping_stats" | awk '{print $3}')
 
+    # Monotonic sample counter (pinger/faker writes it) so the badge can scroll by
+    # the EXACT number of new samples since its last poll. 0 if unavailable.
+    seq=$(cat "$STATE_DIR/traffic_seq_$iface" 2>/dev/null)
+    [ -z "$seq" ] && seq=0
+
     [ "$first" = 1 ] || printf ','
     first=0
-    printf '{"name":"%s","iface":"%s","up":%s,"down_bps":%s,"up_bps":%s,"down_max":%s,"up_max":%s,"total_down":%s,"total_up":%s,"pings":%s,"rtt_ms":%s,"loss_pct":%s}' \
+    printf '{"name":"%s","iface":"%s","up":%s,"down_bps":%s,"up_bps":%s,"down_max":%s,"up_max":%s,"total_down":%s,"total_up":%s,"pings":%s,"rtt_ms":%s,"loss_pct":%s,"seq":%s}' \
         "$name" "$iface" "$up" "$drx" "$dtx" "$((dmax*1000000))" "$((umax*1000000))" "$rx" "$tx" \
-        "$pings_json" "$rtt_ms" "$loss_pct"
+        "$pings_json" "$rtt_ms" "$loss_pct" "$seq"
 done
 
 # Top-level conns: only emit if /proc/net/nf_conntrack exists.

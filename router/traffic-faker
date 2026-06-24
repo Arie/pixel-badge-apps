@@ -2,16 +2,19 @@
 # traffic-faker — DEV ONLY. Writes synthetic ping samples (baseline jitter +
 # occasional spikes + occasional loss) to the ring buffer so the badge
 # net_traffic graph shows lively data instead of a flat real connection.
-# awk-driven (no $RANDOM / usleep needed). Appends 5 new samples each second,
-# matching ~5 pings/sec at the badge's 1 Hz poll. Run INSTEAD of traffic-pinger
-# while developing:
+# awk-driven (no $RANDOM / usleep needed). Appends 5 new samples each second
+# (busybox has no sub-second sleep) and maintains a monotonic sample counter in
+# /tmp/traffic_seq_<iface> so the badge can scroll by the exact number of new
+# samples. Run INSTEAD of traffic-pinger while developing:
 #     /etc/init.d/traffic-pinger stop; /etc/init.d/traffic-pinger disable
 #     /tmp/traffic-faker pppoe-ppp0 &
 IFACE="${1:-pppoe-ppp0}"
 RING="/tmp/traffic_ping_$IFACE"
-exec awk -v ring="$RING" 'BEGIN{
+SEQF="/tmp/traffic_seq_$IFACE"
+exec awk -v ring="$RING" -v seqf="$SEQF" 'BEGIN{
   srand();
   for (i = 0; i < 32; i++) a[i] = 20;            # seed at baseline
+  seq = 0;
   while (1) {
     for (k = 0; k < 5; k++) {                     # 5 new samples per second
       r = int(rand() * 100);
@@ -20,10 +23,11 @@ exec awk -v ring="$RING" 'BEGIN{
       else             v = 14 + int(rand() * 12);  # baseline 14-25ms
       for (i = 0; i < 31; i++) a[i] = a[i + 1];     # shift left
       a[31] = v;                                    # append newest
+      seq++;
     }
     s = a[0]; for (i = 1; i < 32; i++) s = s " " a[i];
-    tmp = ring ".tmp"; print s > tmp; close(tmp);
-    system("mv " tmp " " ring);
+    print s   > (ring ".tmp"); close(ring ".tmp"); system("mv " ring ".tmp " ring);
+    print seq > (seqf ".tmp"); close(seqf ".tmp"); system("mv " seqf ".tmp " seqf);
     system("sleep 1");
   }
 }'

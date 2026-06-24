@@ -51,6 +51,13 @@ update_ring() {
     done
     # Write updated ring (leading space from $* is harmless for consumers).
     printf '%s\n' "$* $rtt" > "$ringfile"
+
+    # Bump the monotonic sample counter the CGI exposes as "seq" so the badge can
+    # scroll by the exact number of new samples since its last poll.
+    local seqfile="/tmp/traffic_seq_${iface}"
+    local seq=0
+    [ -f "$seqfile" ] && seq=$(cat "$seqfile")
+    printf '%s\n' "$((seq + 1))" > "$seqfile"
 }
 
 # Main loop — runs forever, cycling through WANs.
