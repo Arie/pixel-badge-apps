@@ -27,7 +27,10 @@ ignore = ["UP031", "UP032"]   # %-formatting is required on the MicroPython badg
 [tool.ruff.lint.per-file-ignores]
 # The badge app is MicroPython: grouped/guarded imports, a config block between
 # imports, chained one-line ifs, and compact font/icon tables are intentional.
-"app/ha_energy/__init__.py" = ["E401", "E402", "E701", "E702", "E731", "E741", "E501", "I001"]
+# F401: hub75 kept in guard for ON_BADGE detection; fb/H re-exported as app attrs for tests.
+"app/ha_energy/__init__.py" = ["E401", "E402", "E701", "E702", "E731", "E741", "E501", "I001", "F401"]
+# MicroPython shared lib: grouped hardware guard import is intentional (no f-strings, no hints).
+"lib/pixelbadge/matrix.py" = ["E401", "I001"]
 
 [tool.ruff.format]
 # Keep the compact, hand-tuned MicroPython layout (font/icon tables) as-is.

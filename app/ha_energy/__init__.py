@@ -15,7 +15,7 @@ try:                                             # badge-only hardware modules
 except ImportError:                              # host: the pure logic still imports fine
     ON_BADGE = False
 
-W, H = 32, 8
+from pixelbadge.matrix import W, H, fb, fb_clear, px, fb_blit
 
 # ---- config ----------------------------------------------------------------
 # DEFAULTS are this install's values; config.json (gitignored) overrides them.
@@ -339,19 +339,6 @@ def _build_stats(c):
 STATS, ENTITIES, BAT_POWER_IDS = _build_stats(cfg)
 BATSUM = {'kind':'batsummary', 'id':'BAT'}
 VALUES = {}     # id -> float (raw HA readings)
-
-# ---- framebuffer ------------------------------------------------------------
-fb = [0] * (W * H)
-def fb_clear():
-    for i in range(W * H):
-        fb[i] = 0
-def px(x, y, color):
-    if 0 <= x < W and 0 <= y < H:
-        r, g, b = color
-        fb[y * W + x] = (r << 24) | (g << 16) | (b << 8) | 255
-def fb_blit():
-    rgb.clear()
-    hub75.image(fb, 0, 0, W, H)
 
 # ---- proportional font ------------------------------------------------------
 def ink_bounds(g):
