@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>net_traffic — display mockup</title>
+  <link rel="stylesheet" href="./sim.css">
+  <style>
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 28px; margin: 10px 0; max-width: 1050px; }
+    .tile .matrix { width: 320px; height: 80px; }
+    .tile .cap { font-size: 13px; color: #cfe3ff; margin-top: 6px; }
+    .tile .sub { font-size: 11px; color: #7a8a99; }
+  </style>
+</head>
+<body>
+  <h1>net_traffic — first display pass</h1>
+  <p class="subtitle">Candidate auto-rotating screens (one stat per screen, like ha_energy). Sample: 1 Gbps WAN, busy LAN-party-ish. Icons + colors are rough — react and we iterate.</p>
+  <div class="grid" id="grid"></div>
+
+  <script src="./pixelfont.js"></script>
+  <script src="./matrix.js"></script>
+  <script>
+    const PF = window.PixelFont, M = window.Matrix;
+    const C = { down:'#2ed640', up:'#4fc3ff', total:'#9aa7b3', lat:'#ff9d3a', conns:'#5518cc', alert:'#ff2a2a' };
+    const ICON = {
+      DOWN: ["...##...","...##...",".######.","..####..","...##..."],
+      UP:   ["...##...","..####..",".######.","...##...","...##..."],
+      SIG:  ["######..",".#......","..#.....",".#......","######.."],
+      CLOCK:[".######.","#..#...#","#..##..#","#......#",".######."],
+      LINK: ["##....#.",".#...#..","..###...","..#...#.",".#....##"],
+      WARN: ["...#....","..###...","..#.#...",".##.##..","..###..."],
+    };
+    function rate(bps){ return bps>=1e6 ? Math.round(bps/1e6)+'M' : Math.round(bps/1e3)+'K'; }
+    function bytes(b){ return b>=1e9 ? (b/1e9).toFixed(0)+'G' : Math.round(b/1e6)+'M'; }
+
+    function tile(cap, sub, draw){
+      const wrap=document.createElement('div'); wrap.className='tile';
+      const mx=document.createElement('div'); mx.className='matrix';
+      const c=document.createElement('div'); c.className='cap'; c.textContent=cap;
+      const s=document.createElement('div'); s.className='sub'; s.textContent=sub||'';
+      wrap.append(mx,c,s); document.getElementById('grid').append(wrap);
+      const m=new M(mx), b=M.blank();
+      draw(b); m.paint(b);
+    }
+    function icon(b,rows,col,xoff){ xoff=xoff||0; for(let r=0;r<rows.length;r++)for(let x=0;x<rows[r].length;x++) if(rows[r][x]==='#') PF.setPixel(b,x+xoff,r,col); }
+    function bar(b,frac,col){ const n=Math.round(Math.min(1,frac)*32); for(let i=0;i<n;i++) PF.setPixel(b,i,7,col); }
+    function screen(b, ic, icCol, text, txtCol, frac, barCol){
+      icon(b, ic, icCol);
+      PF.drawText(b, 9, 0, text, txtCol);
+      if (frac!=null) bar(b, frac, barCol||txtCol);
+    }
+
+    // full-width ping sparkline: one column per ping, height=RTT, lost=red column
+    function pingGraph(b, pings, maxMs){
+      for(let x=0;x<32 && x<pings.length;x++){
+        const v=pings[x];
+        if(v<0){ for(let y=0;y<8;y++) PF.setPixel(b,x,y,C.alert); continue; }  // lost packet
+        const h=Math.max(1,Math.round(v/maxMs*8));
+        const col=v<30?C.down:(v<80?C.lat:C.alert);
+        for(let y=0;y<h;y++) PF.setPixel(b,x,7-y,col);
+      }
+    }
+    // sample: ~12ms baseline, jitter, a spike, two lost (-1)
+    const P1=[11,13,12,14,11,12,15,13,12,11,14,18,22,16,13,12,11,13,-1,14,12,11,13,12,14,16,13,12,11,13,12,14];
+    const P2=[20,22,-1,25,60,75,82,-1,-1,40,28,24,22,21,23,22,-1,24,26,70,90,-1,-1,55,30,24,22,23,21,22,24,23];
+
+    const DMAX=1e9;
+    tile('WAN1 download',   '680 Mbps of 1 Gbps → 68% gauge',     b=>screen(b, ICON.DOWN, C.down, rate(680e6), C.down, 680e6/DMAX));
+    tile('WAN1 upload',     '210 Mbps → 21%',                     b=>screen(b, ICON.UP,   C.up,   rate(210e6), C.up,   210e6/DMAX));
+    tile('WAN1 total down', 'lifetime bytes, no gauge',           b=>screen(b, ICON.SIG,  C.total,bytes(277e9), C.total, null));
+    tile('WAN1 ping graph ★','last 32 pings @0.2s — height=RTT, red=lost', b=>pingGraph(b, P1, 100));
+    tile('connections',     '1240 active flows (conntrack)',      b=>screen(b, ICON.LINK, C.conns,'1240', C.conns, null));
+    tile('WAN2 download',   'multi-WAN: "2" tag + offset arrow',  b=>{ PF.drawText(b,0,0,'2',C.up); icon(b, ICON.DOWN, C.down, 4); PF.drawText(b,13,0,rate(120e6),C.down); bar(b,120e6/DMAX,C.down); });
+    tile('WAN2 ping (bad) ⚠','spikes + losses → alert: jumps front, this IS the loss view', b=>pingGraph(b, P2, 100));
+    tile('latency as number','alt: single RTT value + gauge',     b=>screen(b, ICON.CLOCK, C.down, '14MS', C.down, 14/100));
+  </script>
+</body>
+</html>
