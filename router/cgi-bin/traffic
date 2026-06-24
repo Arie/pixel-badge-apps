@@ -1,0 +1,60 @@
+#!/bin/sh
+# traffic CGI — per-WAN internet throughput for the Pixel-badge net_traffic app.
+# Reads /proc/net/dev, computes down/up bit-rates from the delta since the last
+# call (state in /tmp), and emits JSON. POSIX sh (busybox ash) — no extra packages.
+#
+# WAN list comes from /etc/traffic.conf, one WAN per line:
+#     <iface> <name> <down_mbps> <up_mbps>
+# e.g.  pppoe-ppp0 WAN1 1000 1000
+# If the file is absent, the default-route interface is auto-detected as "WAN".
+#
+# Install: copy to /www/cgi-bin/traffic (chmod +x); add that path to
+# /etc/sysupgrade.conf so it survives sysupgrade. Poll http://<router>/cgi-bin/traffic
+
+STATE_DIR=/tmp
+CONF=/etc/traffic.conf
+
+wan_lines() {
+    if [ -f "$CONF" ]; then
+        grep -vE '^[[:space:]]*(#|$)' "$CONF"
+    else
+        dev=$(ip route get 8.8.8.8 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -1)
+        [ -n "$dev" ] && echo "$dev WAN 1000 1000"
+    fi
+}
+
+now=$(date +%s)
+
+printf 'Content-Type: application/json\r\n'
+printf 'Cache-Control: no-store\r\n\r\n'
+printf '{"wans":['
+
+first=1
+wan_lines | while read -r iface name dmax umax _rest; do
+    [ -z "$iface" ] && continue
+    line=$(grep -E "^[[:space:]]*$iface:" /proc/net/dev)
+    if [ -z "$line" ]; then up=false; rx=0; tx=0; else
+        up=true
+        set -- $(echo "$line" | sed 's/.*://')   # rx_bytes=$1 ... tx_bytes=$9
+        rx=$1; tx=$9
+    fi
+    [ -z "$dmax" ] && dmax=1000
+    [ -z "$umax" ] && umax=1000
+
+    sf="$STATE_DIR/traffic_$iface"
+    drx=0; dtx=0
+    if [ -f "$sf" ]; then
+        read -r pt prx ptx < "$sf"
+        dt=$((now - pt)); [ "$dt" -le 0 ] && dt=1
+        [ "$rx" -ge "$prx" ] 2>/dev/null && drx=$(( (rx - prx) * 8 / dt ))
+        [ "$tx" -ge "$ptx" ] 2>/dev/null && dtx=$(( (tx - ptx) * 8 / dt ))
+    fi
+    echo "$now $rx $tx" > "$sf"
+
+    [ "$first" = 1 ] || printf ','
+    first=0
+    printf '{"name":"%s","iface":"%s","up":%s,"down_bps":%s,"up_bps":%s,"down_max":%s,"up_max":%s,"total_down":%s,"total_up":%s}' \
+        "$name" "$iface" "$up" "$drx" "$dtx" "$((dmax*1000000))" "$((umax*1000000))" "$rx" "$tx"
+done
+
+printf ']}\n'
