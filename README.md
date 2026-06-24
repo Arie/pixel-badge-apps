@@ -76,6 +76,7 @@ logic (derivations, formatting, font metrics, battery/idle rules) — no badge n
 Badge on USB (CH340 → e.g. `/dev/ttyUSB1`; the default is the stable by-id path):
 
 ```bash
+uv run tools/badge.py deploy-lib        # push lib/pixelbadge/* -> badge /lib/pixelbadge/
 uv run tools/badge.py deploy            # push app/ha_energy/* -> apps/ha_energy/
 uv run tools/badge.py launch ha_energy  # start it (badge reboots into the app)
 ```

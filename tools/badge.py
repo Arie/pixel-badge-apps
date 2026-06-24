@@ -14,6 +14,7 @@ Default port is the CH340 by-id path; override with --port or $BADGE_PORT.
 """
 
 import argparse
+import glob
 import os
 import pathlib
 import sys
@@ -84,6 +85,12 @@ def put(s, local, remote):
     print("put %d bytes -> %s" % (len(data), remote))
 
 
+def cmd_deploy_lib(s, _args):
+    for local in sorted(glob.glob(str(ROOT / "lib" / "pixelbadge" / "*.py"))):
+        remote = "lib/pixelbadge/" + os.path.basename(local)
+        put(s, local, remote)
+
+
 def cmd_deploy(s, _args):
     src = ROOT / "app" / "ha_energy"
     for name in APP_FILES:
@@ -118,6 +125,7 @@ def main():
     p.add_argument("--port", default=DEFAULT_PORT)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("deploy").set_defaults(func=cmd_deploy)
+    sub.add_parser("deploy-lib").set_defaults(func=cmd_deploy_lib)
     lp = sub.add_parser("launch")
     lp.add_argument("name")
     lp.set_defaults(func=cmd_launch)
