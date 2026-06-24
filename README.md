@@ -16,6 +16,34 @@ LED matrix. Single auto-advancing gauge view; ◀▶ step (latches auto-rotate o
 - Copy `app/ha_energy/config.example.json` → `config.json` and fill in your HA
   token + entity IDs (gitignored).
 
+## Setup & deploy (first run)
+
+You need: the badge on USB, a [uv](https://docs.astral.sh/uv/) install, and a
+Home Assistant long-lived access token.
+
+```bash
+git clone git@github.com:Arie/pixel-badge-apps.git
+cd pixel-badge-apps
+uv sync                                              # venv + deps (pyserial etc.)
+
+# 1. Create a HA token: HA → your profile → Security → "Long-lived access tokens"
+# 2. Configure the app (gitignored, never committed):
+cp app/ha_energy/config.example.json app/ha_energy/config.json
+$EDITOR app/ha_energy/config.json                    # paste token + your entity IDs
+
+# 3. Plug in the badge, then:
+uv run tools/badge.py deploy                          # push app/ha_energy/* to the badge
+uv run tools/badge.py launch ha_energy               # boot into the app
+```
+
+`config.json` holds `base_url`, `token`, `poll_seconds`, `brightness`, and the
+`entities` map (solar/grid + each battery's SOC & power sensors). The serial port
+defaults to the CH340 by-id path; override with `--port /dev/ttyUSB1` or
+`$BADGE_PORT`. Re-run `deploy` after editing the app, then `launch` (or reset the
+badge). Press **B** on the badge to return to the launcher.
+
+**Controls:** ◀▶ step stats (pauses auto-rotate) · **A** resume/pause · ▲▼ brightness · **B** exit.
+
 ## Layout
 
 ```
