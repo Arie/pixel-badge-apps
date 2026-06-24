@@ -18,7 +18,7 @@ dev = [
 # ---- ruff (lint + format) ---------------------------------------------------
 [tool.ruff]
 line-length = 100
-extend-exclude = ["mockup", ".superpowers", "app/ha_energy/icon.py"]
+extend-exclude = ["mockup", ".superpowers", "app/ha_energy/icon.py", "app/net_traffic/icon.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
@@ -29,12 +29,13 @@ ignore = ["UP031", "UP032"]   # %-formatting is required on the MicroPython badg
 # imports, chained one-line ifs, and compact font/icon tables are intentional.
 # F401: hub75 kept in guard for ON_BADGE detection; fb/H re-exported as app attrs for tests.
 "app/ha_energy/__init__.py" = ["E401", "E402", "E701", "E702", "E731", "E741", "E501", "I001", "F401"]
+"app/net_traffic/__init__.py" = ["E401", "E402", "E701", "E702", "E731", "E741", "E501", "I001", "F401"]
 # MicroPython shared lib: grouped hardware guard import is intentional (no f-strings, no hints).
 "lib/pixelbadge/*.py" = ["E401", "E402", "E701", "E702", "E731", "E741", "E501", "I001"]
 
 [tool.ruff.format]
 # Keep the compact, hand-tuned MicroPython layout (font/icon tables) as-is.
-exclude = ["app/ha_energy/__init__.py"]
+exclude = ["app/ha_energy/__init__.py", "app/net_traffic/__init__.py"]
 
 # ---- pytest -----------------------------------------------------------------
 [tool.pytest.ini_options]

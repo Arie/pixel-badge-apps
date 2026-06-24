@@ -1,0 +1,1 @@
+{"name":"net_traffic","description":"Per-WAN internet traffic monitor: download/upload rates, total bytes, ping-graph sparkline, and connection count from OpenWRT router CGI. Screens auto-advance; bad-ping WAN jumps to front with blink alert.","category":"system","author":"Arie","revision":1}

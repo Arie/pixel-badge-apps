@@ -12,10 +12,19 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP_PATH = ROOT / "app" / "ha_energy" / "__init__.py"
+NET_APP_PATH = ROOT / "app" / "net_traffic" / "__init__.py"
 
 
 def _load():
     spec = importlib.util.spec_from_file_location("ha_energy", APP_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.ON_BADGE is False, "tests must run off-device"
+    return module
+
+
+def _load_net():
+    spec = importlib.util.spec_from_file_location("net_traffic", NET_APP_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.ON_BADGE is False, "tests must run off-device"
@@ -28,6 +37,12 @@ def app():
     module = _load()
     module.VALUES.clear()
     return module
+
+
+@pytest.fixture
+def net_app():
+    """Fresh net_traffic module for each test."""
+    return _load_net()
 
 
 def stat(app, stat_id):

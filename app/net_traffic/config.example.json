@@ -1,0 +1,9 @@
+{
+  "base_url": "http://192.168.1.1",
+  "poll_seconds": 5,
+  "brightness": 10,
+  "auto_advance_seconds": 2.5,
+  "ping_scale_ms": 60,
+  "rtt_alert_ms": 100,
+  "loss_alert_pct": 5
+}
