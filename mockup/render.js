@@ -13,16 +13,15 @@
     return txt.replace(/(\.\d)\d/, '$1');           // 2.40K -> 2.4K
   }
 
-  // Flow-stat gauge bar: anchored by sign, scaled to the stat max, blinks red over max.
+  // Flow-stat gauge bar: always grows from the left, scaled to the stat max;
+  // colour shows the sign (green export / purple import). Blinks red over max.
   function gauge(matrix, b, s, v, col) {
     const max = s.kind === 'grid' ? (v < 0 ? s.maxNeg : s.maxPos) : s.max;
     const frac = Math.abs(v) / max;
     if (frac > 1) {
       if (Blink.on) matrix.barLeft(b, 7, 1, C.COLORS.alert);   // overflow → blinking red
-    } else if (C.isSigned(s) && v < 0) {
-      matrix.barRight(b, 7, frac, col);                        // export → from right
     } else {
-      matrix.barLeft(b, 7, frac, col);                         // consume/import & unidir → from left
+      matrix.barLeft(b, 7, frac, col);
     }
   }
 

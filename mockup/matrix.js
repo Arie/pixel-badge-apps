@@ -48,12 +48,6 @@
       const n = Math.min(W, Math.round(Math.min(1, frac) * W));
       for (let i = 0; i < n; i++) window.PixelFont.setPixel(buf, i, y, color);
     }
-    // Full-width bar anchored at the RIGHT edge (x31), growing left. Used for
-    // negative (discharge/export) values so the anchor side encodes direction.
-    barRight(buf, y, frac, color) {
-      const n = Math.min(W, Math.round(Math.min(1, frac) * W));
-      for (let i = 0; i < n; i++) window.PixelFont.setPixel(buf, W - 1 - i, y, color);
-    }
     paint(buf) {
       for (let y = 0; y < H; y++)
         for (let x = 0; x < W; x++)

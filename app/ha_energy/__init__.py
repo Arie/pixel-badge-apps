@@ -367,10 +367,6 @@ def bar_left(y, frac, color):
     n = int(min(1.0, frac) * W + 0.5)
     for i in range(n):
         px(i, y, color)
-def bar_right(y, frac, color):
-    n = int(min(1.0, frac) * W + 0.5)
-    for i in range(n):
-        px(W - 1 - i, y, color)
 
 # ---- values, colours, formatting --------------------------------------------
 def value_of(s):
@@ -439,10 +435,8 @@ def gauge(s, v, col):
     if frac > 1:
         if blink_on:
             bar_left(7, 1.0, ALERT)
-    elif is_signed(s) and v < 0:
-        bar_right(7, frac, col)
     else:
-        bar_left(7, frac, col)
+        bar_left(7, frac, col)      # always from the left; colour shows the sign
 
 def draw_stat(s):
     k = s['kind']

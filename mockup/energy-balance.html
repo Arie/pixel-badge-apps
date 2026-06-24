@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>USE gauge — solar indicator</title>
+  <link rel="stylesheet" href="./sim.css">
+  <style>
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 8px 0 26px; max-width: 1200px; }
+    .tile .matrix { width: 320px; height: 80px; }
+    .tile .cap { font-size: 12px; color: #8a97a6; margin-top: 6px; }
+    h2 { font-size: 14px; color: #cfe3ff; margin: 22px 0 4px; }
+    .note { color: #8a97a6; font-size: 12px; margin: 0 0 8px; max-width: 900px; }
+  </style>
+</head>
+<body>
+  <h1>USE gauge — "how much solar?" indicator</h1>
+  <p class="subtitle">Goal: see at a glance if solar ≈ usage (zero-metering). Bar/marker scaled to 6 kW.</p>
+
+  <h2>Option A — solar marker (recommended)</h2>
+  <p class="note">Purple bar = home usage. Green tick (raised) = current solar. Marker short of the bar
+    end → importing the gap; marker at the end → zero-metering; marker past the end → exporting.</p>
+  <div class="grid" id="optA"></div>
+
+  <h2>Option B — two-tone bar</h2>
+  <p class="note">Green = solar covering the house, purple tail = grid import, green overshoot past usage = export.</p>
+  <div class="grid" id="optB"></div>
+
+  <script src="./pixelfont.js"></script>
+  <script src="./matrix.js"></script>
+  <script>
+    const PF = window.PixelFont, M = window.Matrix;
+    const SCALE = 6000;
+    const PURPLE = '#5518cc', GREEN = '#2ed640', DIMG = '#1c7a2a';
+    const HOME = ["...##...", "..####..", ".######.", ".#....#.", ".#.##.#."];
+    function fmt(w){ return w < 1000 ? w+'W' : (w/1000).toFixed(2)+'KW'; }
+    function px(b,x,y,c){ PF.setPixel(b,x,y,c); }
+    function icon(b,rows,c){ for(let r=0;r<rows.length;r++)for(let x=0;x<rows[r].length;x++) if(rows[r][x]==='#') px(b,x,r,c); }
+    function col(w){ return Math.min(31, Math.round(w/SCALE*32)); }
+
+    function tile(parent, cap){
+      const wrap=document.createElement('div'); wrap.className='tile';
+      const mx=document.createElement('div'); mx.className='matrix';
+      const c=document.createElement('div'); c.className='cap'; c.textContent=cap;
+      wrap.appendChild(mx); wrap.appendChild(c); parent.appendChild(wrap);
+      return new M(mx);
+    }
+    function optA(parent, usage, solar, cap){
+      const m=tile(parent,cap), b=M.blank();
+      icon(b,HOME,PURPLE);
+      PF.drawText(b,9,1,fmt(usage),PURPLE);
+      for(let i=0;i<col(usage);i++) px(b,i,7,PURPLE);   // usage bar
+      const sx=col(solar);                              // solar marker (raised tick, rows 6-7)
+      px(b,sx,7,GREEN); px(b,sx,6,GREEN);
+      m.paint(b);
+    }
+    function optB(parent, usage, solar, cap){
+      const m=tile(parent,cap), b=M.blank();
+      icon(b,HOME,PURPLE);
+      PF.drawText(b,9,1,fmt(usage),PURPLE);
+      const u=col(usage), s=col(solar), self=Math.min(u,s);
+      for(let i=0;i<self;i++) px(b,i,7,GREEN);          // solar covering the house
+      for(let i=self;i<u;i++) px(b,i,7,PURPLE);         // grid import (usage beyond solar)
+      for(let i=u;i<s;i++) px(b,i,7,DIMG);              // export overshoot (solar beyond usage)
+      m.paint(b);
+    }
+    const A=document.getElementById('optA'), B=document.getElementById('optB');
+    const cases=[[2500,1500,'importing 1.0kW (solar < usage)'],
+                 [2000,2000,'zero-metering (solar = usage)'],
+                 [1500,3500,'exporting 2.0kW (solar > usage)']];
+    cases.forEach(([u,s,c])=>optA(A,u,s,c));
+    cases.forEach(([u,s,c])=>optB(B,u,s,c));
+  </script>
+</body>
+</html>
