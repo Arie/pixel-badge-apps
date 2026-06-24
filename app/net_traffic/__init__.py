@@ -119,7 +119,7 @@ def build_screens(wans, conns):
     screens = []
     for i, wan in enumerate(wans):
         iface = wan['iface']
-        prefix = wan.get('name', str(i + 1)) if multi else ''
+        prefix = str(i + 1) if multi else ''      # compact 1-char WAN tag (1, 2, ...)
         screens.append({'id': '%s:down' % iface, 'kind': 'down', 'iface': iface,
                         'bps': wan['down_bps'], 'bps_max': wan['down_max'],
                         'prefix': prefix, 'wan': wan})
@@ -372,26 +372,25 @@ def draw_screen(s):
         draw_text(0, 4, '---' if s.get('stale') else 'WAIT', GREY)
         return
     if k == 'down':
-        draw_icon(0, 0, ICONS['DOWN'], RED)
-        px_off = 9
-        txt = fmt_rate(s['bps'])
-        draw_text(px_off, 0, txt, RED)
+        x = _draw_prefix(s.get('prefix', ''))            # WAN tag (multi-WAN only)
+        draw_icon(x, 0, ICONS['DOWN'], RED)
+        draw_text(x + 9, 0, fmt_rate(s['bps']), RED)
         if s['bps_max'] > 0:
             bar_left(7, s['bps'] / s['bps_max'], RED)
         return
     if k == 'up':
-        draw_icon(0, 0, ICONS['UP'], GREEN)
-        px_off = 9
-        txt = fmt_rate(s['bps'])
-        draw_text(px_off, 0, txt, GREEN)
+        x = _draw_prefix(s.get('prefix', ''))
+        draw_icon(x, 0, ICONS['UP'], GREEN)
+        draw_text(x + 9, 0, fmt_rate(s['bps']), GREEN)
         if s['bps_max'] > 0:
             bar_left(7, s['bps'] / s['bps_max'], GREEN)
         return
     if k == 'total':
         down = s.get('dir') == 'down'
-        col = RED if down else GREEN                     # match the rate colours
-        draw_icon(0, 0, ICONS['DOWN'] if down else ICONS['UP'], col)  # arrow = direction
-        draw_text(9, 0, fmt_bytes(s['total']), col)
+        col = RED if down else GREEN                      # match the rate colours
+        x = _draw_prefix(s.get('prefix', ''))
+        draw_icon(x, 0, ICONS['DOWN'] if down else ICONS['UP'], col)  # arrow = direction
+        draw_text(x + 9, 0, fmt_bytes(s['total']), col)
         return
     if k == 'conns':
         draw_icon(0, 0, ICONS['CONNS'], PURPLE)
@@ -444,8 +443,13 @@ def draw_screen(s):
         # avg overlay always uses real current pings
         a = avg_ping(pings)
         lbl = avg_label(a)
+        pfx = s.get('prefix', '')
+        ox = 0
+        if pfx:                                  # WAN tag, then the avg (multi-WAN)
+            draw_text_outline(0, 0, pfx, WHITE)
+            ox = text_width(pfx) + 2
         if lbl:
-            draw_text_outline(0, 0, lbl, WHITE)
+            draw_text_outline(ox, 0, lbl, WHITE)
         return
 
 def render(s):
