@@ -60,7 +60,7 @@ def run(s, code, timeout=15):
         chunk = s.read(512)
         if chunk:
             buf += chunk
-            if buf.endswith(PROMPT):   # ">>> " ends with a space — don't rstrip it
+            if buf.endswith(PROMPT):  # ">>> " ends with a space — don't rstrip it
                 break
     return buf.decode("utf-8", "replace")
 

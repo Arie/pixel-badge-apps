@@ -9,11 +9,20 @@ def cfg_with(app, **over):
 
 
 def test_two_battery_config(app):
-    cfg = cfg_with(app, batteries=[
-        {"label": "A", "soc": "sensor.a_soc", "power": "sensor.a_pw",
-         "power_max": 1000, "weight": 2, "soc_min": 5},
-        {"label": "B", "soc": "sensor.b_soc", "power": "sensor.b_pw"},
-    ])
+    cfg = cfg_with(
+        app,
+        batteries=[
+            {
+                "label": "A",
+                "soc": "sensor.a_soc",
+                "power": "sensor.a_pw",
+                "power_max": 1000,
+                "weight": 2,
+                "soc_min": 5,
+            },
+            {"label": "B", "soc": "sensor.b_soc", "power": "sensor.b_pw"},
+        ],
+    )
     stats, ents, pids = app._build_stats(cfg)
     bats = [s for s in stats if s["kind"] == "battery"]
     assert [b["id"] for b in bats] == ["A", "B"]
@@ -38,12 +47,15 @@ def test_flow_entities_mapped(app):
 
 
 def test_malformed_batteries_skipped(app):
-    cfg = cfg_with(app, batteries=[
-        {"label": "OK", "soc": "sensor.s", "power": "sensor.p"},
-        {"label": "BAD"},                 # no soc/power
-        {"soc": "x", "power": "y"},        # no label
-        {},                                # empty
-    ])
+    cfg = cfg_with(
+        app,
+        batteries=[
+            {"label": "OK", "soc": "sensor.s", "power": "sensor.p"},
+            {"label": "BAD"},  # no soc/power
+            {"soc": "x", "power": "y"},  # no label
+            {},  # empty
+        ],
+    )
     stats, ents, pids = app._build_stats(cfg)
     assert [s["id"] for s in stats if s["kind"] == "battery"] == ["OK"]
     assert pids == ["OKP"]
