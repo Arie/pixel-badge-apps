@@ -247,3 +247,22 @@ def test_alert_wan_exact_threshold_triggers(net_app):
 def test_alert_wan_rtt_exact_threshold(net_app):
     wans = [{"iface": "eth0", "loss_pct": 0, "rtt_ms": 100}]
     assert net_app.alert_wan(wans, 100, 5) == "eth0"
+
+
+# ---- avg_ping ----------------------------------------------------------------
+
+
+def test_avg_ping_normal(net_app):
+    assert net_app.avg_ping([10, 20, 30]) == 20
+
+
+def test_avg_ping_excludes_losses(net_app):
+    assert net_app.avg_ping([10, -1, 20, -1]) == 15
+
+
+def test_avg_ping_all_loss(net_app):
+    assert net_app.avg_ping([-1, -1]) == -1
+
+
+def test_avg_ping_empty(net_app):
+    assert net_app.avg_ping([]) == -1

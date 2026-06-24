@@ -26,7 +26,7 @@ DEFAULTS = {
     'poll_seconds': 5,
     'brightness': 10,
     'auto_advance_seconds': 2.5,
-    'ping_scale_ms': 60,    # ping-graph full-height RTT in ms
+    'ping_scale_ms': 30,    # ping-graph full-height RTT in ms
     'rtt_alert_ms': 100,    # RTT at or above this → alert
     'loss_alert_pct': 5,    # loss% at or above this → alert
 }
@@ -51,6 +51,7 @@ GREY   = (0x9a, 0xa7, 0xb3)   # total
 PURPLE = (0x55, 0x18, 0xcc)   # conns / ping-loss
 AMBER  = (0xff, 0x9d, 0x3a)   # ping medium latency
 RED    = (0xff, 0x2a, 0x2a)   # ping high latency / alert
+WHITE  = (0xdf, 0xe7, 0xee)   # avg-ping overlay text
 
 # ---- icon bitmaps (LOCKED from net-options.html ★ FINAL choices) ----------
 # '#' = lit pixel, '.' = off. Parsed to row strings by _glyph at load.
@@ -166,6 +167,21 @@ def alert_wan(wans, rtt_alert, loss_alert):
             return wan['iface']
     return None
 
+def avg_ping(pings):
+    """Return integer average (rounded) of non-loss entries (>= 0), or -1 if none.
+
+    Loss sentinels are -1 and are excluded from the average.
+    """
+    total = 0
+    count = 0
+    for v in pings:
+        if v >= 0:
+            total += v
+            count += 1
+    if count == 0:
+        return -1
+    return int(round(total / count))
+
 # ---- poll data storage ------------------------------------------------------
 _data = {'wans': [], 'conns': None, 'stale': True}
 
@@ -262,6 +278,9 @@ def draw_screen(s):
                 if color_key == 'purple' and not blink_on:
                     c = (0, 0, 0)    # blink the loss dot
                 px(x, row, c)
+        a = avg_ping(pings)
+        if a >= 0:
+            draw_text(0, 0, "%d" % a, WHITE)
         return
 
 def render(s):
