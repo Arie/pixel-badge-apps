@@ -181,6 +181,31 @@ def avg_ping(pings):
         return -1
     return int(round(total / count))
 
+def avg_label(a):
+    """Return display label for average ping value a.
+
+    a < 0   -> "" (no data; caller should skip drawing)
+    a < 100 -> "%dMS" % a  (e.g. 4 -> "4MS", 14 -> "14MS", 99 -> "99MS")
+    else    -> "%d" % a    (e.g. 120 -> "120")
+    """
+    if a < 0:
+        return ""
+    if a < 100:
+        return "%dMS" % a
+    return "%d" % a
+
+def draw_text_outline(x, y, s, color):
+    """Draw text s at (x, y) with a 1px black outline for readability.
+
+    Draws s in BLACK at the 8 surrounding pixel offsets, then draws s in
+    color at (x, y) on top. Off-screen pixels (e.g. x=-1) are clipped by px.
+    """
+    BLACK = (0, 0, 0)
+    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1),
+                   (-1, -1), (1, -1), (-1, 1), (1, 1)):
+        draw_text(x + dx, y + dy, s, BLACK)
+    draw_text(x, y, s, color)
+
 # ---- poll data storage ------------------------------------------------------
 _data = {'wans': [], 'conns': None, 'stale': True}
 
@@ -279,8 +304,9 @@ def draw_screen(s):
                     c = (0, 0, 0)    # blink the loss dot
                 px(x, row, c)
         a = avg_ping(pings)
-        if a >= 0:
-            draw_text(0, 0, "%d" % a, WHITE)
+        lbl = avg_label(a)
+        if lbl:
+            draw_text_outline(0, 0, lbl, WHITE)
         return
 
 def render(s):

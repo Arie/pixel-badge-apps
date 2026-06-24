@@ -298,3 +298,26 @@ def test_avg_ping_all_loss(net_app):
 
 def test_avg_ping_empty(net_app):
     assert net_app.avg_ping([]) == -1
+
+
+# ---- avg_label ---------------------------------------------------------------
+
+
+def test_avg_label_single_digit(net_app):
+    assert net_app.avg_label(4) == "4MS"
+
+
+def test_avg_label_two_digits(net_app):
+    assert net_app.avg_label(14) == "14MS"
+
+
+def test_avg_label_two_digits_99(net_app):
+    assert net_app.avg_label(99) == "99MS"
+
+
+def test_avg_label_three_digits(net_app):
+    assert net_app.avg_label(120) == "120"
+
+
+def test_avg_label_no_data(net_app):
+    assert net_app.avg_label(-1) == ""
