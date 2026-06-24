@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>net_traffic — options</title>
+  <link rel="stylesheet" href="./sim.css">
+  <style>
+    .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px 28px; margin:6px 0 22px; max-width:1050px; }
+    .row  { display:grid; grid-template-columns:repeat(3,1fr); gap:14px 22px; margin:6px 0 22px; max-width:1050px; }
+    .tile .matrix { width:300px; height:75px; }
+    .tile .cap { font-size:12px; color:#cfe3ff; margin-top:5px; }
+    h2 { font-size:14px; color:#cfe3ff; margin:20px 0 2px; } .note{color:#7a8a99;font-size:12px;margin:0 0 6px;}
+  </style>
+</head>
+<body>
+  <h1>net_traffic — differentiation + icon options</h1>
+
+  <h2>1 · Ping graph: telling loss apart from high latency</h2>
+  <p class="note">Same bad-WAN data (spikes + drops) three ways. Pick how a LOST packet should read vs a slow one.</p>
+  <div class="grid" id="ping"></div>
+
+  <h2>2 · Icon options per stat</h2>
+  <p class="note">Each shown as icon + a sample value. Pick one per stat (or mix).</p>
+  <div class="row" id="icons"></div>
+
+  <script src="./pixelfont.js"></script>
+  <script src="./matrix.js"></script>
+  <script>
+    const PF=window.PixelFont, M=window.Matrix;
+    const GREEN='#2ed640', AMBER='#ff9d3a', RED='#ff2a2a', WHITE='#dfe7ee',
+          BLUE='#4fc3ff', GREY='#9aa7b3', PURP='#5518cc';
+    const P=[20,22,-1,25,60,75,82,-1,-1,40,28,24,22,21,23,22,-1,24,26,70,90,-1,-1,55,30,24,22,23,21,22,24,23];
+
+    function mk(parent,cap,draw){
+      const w=document.createElement('div'); w.className='tile';
+      const mx=document.createElement('div'); mx.className='matrix';
+      const c=document.createElement('div'); c.className='cap'; c.textContent=cap;
+      w.append(mx,c); document.getElementById(parent).append(w);
+      const m=new M(mx), b=M.blank(); draw(b); m.paint(b);
+    }
+    const px=(b,x,y,c)=>PF.setPixel(b,x,y,c);
+    function col8(b,x,h,c){ for(let y=0;y<h;y++) px(b,x,7-y,c); }
+
+    // A: latency green/amber only, RED = loss exclusively (full column)
+    mk('ping','A · red = loss only (latency caps at amber)', b=>{ for(let x=0;x<32;x++){const v=P[x];
+      if(v<0){ for(let y=0;y<8;y++)px(b,x,y,RED); continue; }
+      col8(b,x,Math.max(1,Math.round(Math.min(v,100)/100*8)), v<40?GREEN:AMBER); }});
+    // B: latency green/amber/red by value; loss = red column + WHITE top flag
+    mk('ping','B · loss = red column + white top flag', b=>{ for(let x=0;x<32;x++){const v=P[x];
+      if(v<0){ for(let y=1;y<8;y++)px(b,x,y,RED); px(b,x,0,WHITE); continue; }
+      col8(b,x,Math.max(1,Math.round(Math.min(v,100)/100*8)), v<40?GREEN:(v<80?AMBER:RED)); }});
+    // C: latency bottom bars (cap 7), loss = red dot on the top row only
+    mk('ping','C · loss = red dot on top row, latency below', b=>{ for(let x=0;x<32;x++){const v=P[x];
+      if(v<0){ px(b,x,0,RED); continue; }
+      col8(b,x,Math.max(1,Math.round(Math.min(v,100)/100*7)), v<40?GREEN:(v<80?AMBER:RED)); }});
+
+    // ---- icon options ----
+    function iconTile(name, rows, color, value){
+      mk('icons', name, b=>{ for(let r=0;r<rows.length;r++)for(let x=0;x<rows[r].length;x++) if(rows[r][x]==='#') px(b,x,r,color);
+        PF.drawText(b,9,0,value,color); });
+    }
+    // download
+    iconTile('down A · arrow',  ["...##...","...##...",".######.","..####..","...##..."], GREEN, '680M');
+    iconTile('down B · chevron',["........","##....##",".##..##.","..####..","...##..."], GREEN, '680M');
+    iconTile('down C · to-tray',["...##...",".######.","..####..","........","########"], GREEN, '680M');
+    // upload
+    iconTile('up A · arrow',    ["...##...","..####..",".######.","...##...","...##..."], BLUE, '210M');
+    iconTile('up B · chevron',  ["...##...","..####..",".##..##.","##....##","........"], BLUE, '210M');
+    iconTile('up C · from-tray',["########","........","...##...","..####..",".######."], BLUE, '210M');
+    // total
+    iconTile('total A · sigma', ["######..",".#......","..#.....",".#......","######.."], GREY, '277G');
+    iconTile('total B · cylinder',[".######.","#......#",".######.","#......#",".######."], GREY, '277G');
+    iconTile('total C · stacks',[".######.",".######.","........",".######.",".######."], GREY, '277G');
+    // ping icon (requested 3-bars) + alts
+    iconTile('ping A · 3 bars',["......##","......##","...##.##","##.##.##","##.##.##"], GREEN, '14MS');
+    iconTile('ping B · bars+gap',["......#.","....#.#.","..#.#.#.",".##.#.#.","##.#.#.#"], GREEN, '14MS');
+    iconTile('ping C · wifi',  ["..####..",".#....#.","#.####.#","...##...","...##..."], GREEN, '14MS');
+    // connections
+    iconTile('conn A · chain', [".##..##.","#..##..#","#.#..#.#","#..##..#",".##..##."], PURP, '1240');
+    iconTile('conn B · nodes', ["##....##",".#....#.","..####..",".#....#.","##....##"], PURP, '1240');
+    iconTile('conn C · arrows',["........","..#..#..",".######.","..#..#..","........"], PURP, '1240');
+  </script>
+</body>
+</html>
