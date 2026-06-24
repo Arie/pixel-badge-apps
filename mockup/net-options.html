@@ -53,10 +53,10 @@
     mk('ping','C · loss = red dot on top row, latency below', b=>{ for(let x=0;x<32;x++){const v=P[x];
       if(v<0){ px(b,x,0,RED); continue; }
       col8(b,x,Math.max(1,Math.round(Math.min(v,100)/100*7)), v<40?GREEN:(v<80?AMBER:RED)); }});
-    // D: loss = PURPLE column; latency green/amber/red keeps the severity ramp
-    mk('ping','D · loss = PURPLE, red = very high ping  ★', b=>{ for(let x=0;x<32;x++){const v=P[x];
-      if(v<0){ for(let y=0;y<8;y++)px(b,x,y,PURP); continue; }
-      col8(b,x,Math.max(1,Math.round(Math.min(v,100)/100*8)), v<40?GREEN:(v<80?AMBER:RED)); }});
+    // FINAL: loss = single PURPLE dot at top (empty column below); latency caps at row1
+    mk('ping','★ FINAL · loss = purple top dot + empty column; red = very high ping', b=>{ for(let x=0;x<32;x++){const v=P[x];
+      if(v<0){ px(b,x,0,PURP); continue; }
+      col8(b,x,Math.max(1,Math.round(Math.min(v,100)/100*7)), v<40?GREEN:(v<80?AMBER:RED)); }});
 
     // ---- icon options ----
     function iconTile(name, rows, color, value){
