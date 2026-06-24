@@ -1,6 +1,8 @@
 """Value formatting, adaptive width fit, proportional font, overflow."""
 
 from conftest import stat
+from pixelbadge.pixelfont import FONT
+from pixelbadge.pixelfont import text_width as pf_text_width
 
 
 def test_fmt_power_watts_and_kw(app):
@@ -26,6 +28,17 @@ def test_fit_value_drops_w_then_decimal(app):
     # tighter still: drop a decimal too
     k = app.fit_value("-2.76KW", app.text_width("-2.76K") - 1)
     assert k == "-2.7K"
+
+
+def test_font_has_m_glyph():
+    assert "M" in FONT, "M glyph must be present in FONT"
+    assert len(FONT["M"]) == 5, "M glyph must have 5 rows"
+
+
+def test_text_width_m_glyph_nonzero():
+    assert pf_text_width("45M") > pf_text_width("45"), (
+        "text_width('45M') should be wider than text_width('45') — M must be non-empty"
+    )
 
 
 def test_proportional_font_dot_is_narrow(app):
