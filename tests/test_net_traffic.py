@@ -321,3 +321,31 @@ def test_avg_label_three_digits(net_app):
 
 def test_avg_label_no_data(net_app):
     assert net_app.avg_label(-1) == ""
+
+
+# ---- interp_pings ------------------------------------------------------------
+
+
+def test_interp_pings_midpoint(net_app):
+    # t=0.5: each column tweens halfway
+    assert net_app.interp_pings([10, 20], [20, 40], 0.5) == [15, 30]
+
+
+def test_interp_pings_t0_returns_prev(net_app):
+    # t=0: should return prev when both valid
+    assert net_app.interp_pings([10], [20], 0.0) == [10]
+
+
+def test_interp_pings_t1_returns_new(net_app):
+    # t=1: should return new
+    assert net_app.interp_pings([10], [20], 1.0) == [20]
+
+
+def test_interp_pings_loss_pops(net_app):
+    # loss sentinel (-1) on either side -> pop to new[i], no tween
+    assert net_app.interp_pings([10, -1], [-1, 20], 0.5) == [-1, 20]
+
+
+def test_interp_pings_shorter_prev(net_app):
+    # prev shorter than new: missing entries treated as equal to new (no tween)
+    assert net_app.interp_pings([10], [20, 30], 0.5) == [15, 30]

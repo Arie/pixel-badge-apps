@@ -23,12 +23,13 @@ from pixelbadge.carousel import Carousel
 # ---- config ----------------------------------------------------------------
 DEFAULTS = {
     'base_url': 'http://192.168.1.1',
-    'poll_seconds': 5,
+    'poll_seconds': 1,
     'brightness': 10,
     'auto_advance_seconds': 2.5,
     'ping_scale_ms': 50,    # ping-graph full-height RTT in ms (fixed scale)
-    'rtt_alert_ms': 100,    # RTT at or above this → alert
-    'loss_alert_pct': 5,    # loss% at or above this → alert
+    'rtt_alert_ms': 100,    # RTT at or above this -> alert
+    'loss_alert_pct': 5,    # loss% at or above this -> alert
+    'ping_animate': True,   # smooth height-tween between polls on ping screen
 }
 try:
     with open('apps/net_traffic/config.json') as f:
@@ -194,6 +195,30 @@ def avg_label(a):
         return "%dMS" % a
     return "%d" % a
 
+def interp_pings(prev, new, t):
+    """Interpolate ping values for smooth animation (pure, host-testable).
+
+    Returns a new list same length as new.
+    For each index i:
+      - if prev[i] >= 0 and new[i] >= 0: tween (int round)
+      - else: return new[i] directly (loss/value transitions pop)
+    If prev is shorter than new, missing entries are treated as equal to new
+    (no tween for those columns).
+    t is clamped by the caller to [0,1].
+    """
+    result = []
+    for i in range(len(new)):
+        n = new[i]
+        if i < len(prev):
+            p = prev[i]
+        else:
+            p = n          # no prev -> no tween
+        if p >= 0 and n >= 0:
+            result.append(int(round(p + (n - p) * t)))
+        else:
+            result.append(n)
+    return result
+
 def draw_text_outline(x, y, s, color):
     """Draw text s at (x, y) with a 1px black outline for readability.
 
@@ -209,13 +234,32 @@ def draw_text_outline(x, y, s, color):
 # ---- poll data storage ------------------------------------------------------
 _data = {'wans': [], 'conns': None, 'stale': True}
 
+# Per-iface ping history for animation tweening.
+# prev_pings[iface] = pings list from the poll before last
+# cur_pings[iface]  = pings list from the most recent poll
+# last_poll_ms      = time.ticks_ms() at the moment of the last successful poll
+prev_pings = {}
+cur_pings  = {}
+last_poll_ms = 0
+
 def poll():
     """Fetch /cgi-bin/traffic and update _data. On any error: keep last-good, set stale."""
-    global _data
+    global _data, prev_pings, cur_pings, last_poll_ms
     try:
         r = requests.get(cfg['base_url'] + '/cgi-bin/traffic')
         d = r.json(); r.close()
-        _data['wans'] = d.get('wans', [])
+        new_wans = d.get('wans', [])
+        # Rotate ping history before overwriting
+        for wan in new_wans:
+            iface = wan['iface']
+            new_p = wan.get('pings', [])
+            if iface in cur_pings:
+                prev_pings[iface] = cur_pings[iface]
+            else:
+                prev_pings[iface] = new_p   # first poll: prev == new, t irrelevant
+            cur_pings[iface] = new_p
+        last_poll_ms = time.ticks_ms()
+        _data['wans'] = new_wans
         _data['conns'] = d.get('conns', None)
         _data['stale'] = False
     except Exception:
@@ -291,9 +335,18 @@ def draw_screen(s):
             draw_text(0, 1, 'PING', GREY)
             draw_text(0, 4, '---', GREY)
             return
+        # Compute tween fraction t in [0, 1]
+        iface = s.get('iface', '')
+        if cfg.get('ping_animate') and iface in cur_pings and iface in prev_pings:
+            now_ms = time.ticks_ms()
+            elapsed = time.ticks_diff(now_ms, last_poll_ms)
+            t = min(1.0, elapsed / float(POLL_MS))
+            draw_pings = interp_pings(prev_pings[iface], cur_pings[iface], t)
+        else:
+            draw_pings = pings
         # pad so newest is at x=31
         start_x = max(0, W - n)
-        visible = pings[max(0, n - W):]
+        visible = draw_pings[max(0, n - W):]
         scale = cfg['ping_scale_ms']
         cols = ping_columns(visible, scale)
         for i, ops in enumerate(cols):
@@ -303,6 +356,7 @@ def draw_screen(s):
                 if color_key == 'purple' and not blink_on:
                     c = (0, 0, 0)    # blink the loss dot
                 px(x, row, c)
+        # avg overlay always uses real (cur) pings
         a = avg_ping(pings)
         lbl = avg_label(a)
         if lbl:
@@ -379,13 +433,25 @@ class Display:
             self.car.step(1); self.last_adv = now
             self.dirty = True
 
+    def _is_ping_screen(self):
+        """True if the current screen is a ping screen."""
+        s = self.car.current()
+        return s.get('kind') == 'ping'
+
     def _draw(self, now):
         global blink_on
         blink_on = (now // 450) % 2 == 0
         if self.alerting and blink_on != self.prev_blink:
             self.dirty = True         # animate the alert blink
         self.prev_blink = blink_on
-        if self.dirty:
+        # Ping-animate: bypass dirty gate; always render at ~14fps
+        if cfg.get('ping_animate') and self._is_ping_screen():
+            try:
+                render(self.car.current())
+            except Exception as e:
+                sys.print_exception(e)
+            self.dirty = False
+        elif self.dirty:
             try:
                 render(self.car.current())
             except Exception as e:
@@ -393,6 +459,9 @@ class Display:
             self.dirty = False
 
     def _idle_ms(self, now):
+        # Ping screen with animation: spin at ~14fps (70ms sleep per tick)
+        if cfg.get('ping_animate') and self._is_ping_screen():
+            return 70
         if time.ticks_diff(now, self.touched) < 1200:
             return 50
         return 120 if self.alerting else 220
