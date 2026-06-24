@@ -16,6 +16,7 @@ except ImportError:                              # host: the pure logic still im
     ON_BADGE = False
 
 from pixelbadge.matrix import W, H, fb, fb_clear, px, fb_blit
+from pixelbadge.pixelfont import _glyph, FONT, ink_bounds, draw_text, text_width, draw_icon
 
 # ---- config ----------------------------------------------------------------
 # DEFAULTS are this install's values; config.json (gitignored) overrides them.
@@ -59,222 +60,6 @@ ALERT  = (0xff, 0x2a, 0x2a)   # overflow (blinking)
 # ---- pixel-art tables ------------------------------------------------------
 # Glyphs/icons are drawn as art: '#' = lit pixel, '.' = off. Parsed to rows at
 # load. (Dots, not spaces, so trailing-whitespace tooling can't corrupt them.)
-def _glyph(a):
-    return a.strip("\n").split("\n")
-
-# 3x5 font
-FONT = {ch: _glyph(a) for ch, a in {
-'0': """
-###
-#.#
-#.#
-#.#
-###""",
-'1': """
-.#.
-##.
-.#.
-.#.
-###""",
-'2': """
-###
-..#
-###
-#..
-###""",
-'3': """
-###
-..#
-###
-..#
-###""",
-'4': """
-#.#
-#.#
-###
-..#
-..#""",
-'5': """
-###
-#..
-###
-..#
-###""",
-'6': """
-###
-#..
-###
-#.#
-###""",
-'7': """
-###
-..#
-..#
-..#
-..#""",
-'8': """
-###
-#.#
-###
-#.#
-###""",
-'9': """
-###
-#.#
-###
-..#
-###""",
-'A': """
-###
-#.#
-###
-#.#
-#.#""",
-'B': """
-##.
-#.#
-##.
-#.#
-##.""",
-'C': """
-###
-#..
-#..
-#..
-###""",
-'D': """
-##.
-#.#
-#.#
-#.#
-##.""",
-'E': """
-###
-#..
-###
-#..
-###""",
-'F': """
-###
-#..
-###
-#..
-#..""",
-'G': """
-###
-#..
-#.#
-#.#
-###""",
-'H': """
-#.#
-#.#
-###
-#.#
-#.#""",
-'I': """
-###
-.#.
-.#.
-.#.
-###""",
-'K': """
-#.#
-#.#
-##.
-#.#
-#.#""",
-'L': """
-#..
-#..
-#..
-#..
-###""",
-'N': """
-#.#
-###
-###
-###
-#.#""",
-'O': """
-###
-#.#
-#.#
-#.#
-###""",
-'P': """
-###
-#.#
-###
-#..
-#..""",
-'R': """
-##.
-#.#
-##.
-#.#
-#.#""",
-'S': """
-###
-#..
-###
-..#
-###""",
-'T': """
-###
-.#.
-.#.
-.#.
-.#.""",
-'U': """
-#.#
-#.#
-#.#
-#.#
-###""",
-'W': """
-#.#
-#.#
-###
-###
-#.#""",
-'Z': """
-###
-..#
-.#.
-#..
-###""",
-'.': """
-...
-...
-...
-...
-#..""",
-'-': """
-...
-...
-###
-...
-...""",
-'+': """
-...
-.#.
-###
-.#.
-...""",
-'%': """
-#..
-..#
-.#.
-#..
-..#""",
-' ': """
-...
-...
-...
-...
-...""",
-}.items()}
 
 # 8x5 icons (SUN=SOL, HOME=USE, SELF, GRID=tower, BATT=SOC, BOLT=battery power)
 ICONS = {ch: _glyph(a) for ch, a in {
@@ -340,46 +125,7 @@ STATS, ENTITIES, BAT_POWER_IDS = _build_stats(cfg)
 BATSUM = {'kind':'batsummary', 'id':'BAT'}
 VALUES = {}     # id -> float (raw HA readings)
 
-# ---- proportional font ------------------------------------------------------
-def ink_bounds(g):
-    lo, hi = 3, -1
-    for r in range(5):
-        row = g[r]
-        for c in range(3):
-            if row[c] == '#':
-                if c < lo: lo = c
-                if c > hi: hi = c
-    if hi < 0:
-        return (0, -1, 2)        # space -> 2px
-    return (lo, hi, hi - lo + 1)
-def draw_text(x, y, s, color):
-    cx = x
-    for ch in str(s).upper():
-        g = FONT.get(ch, FONT[' '])
-        lo, hi, w = ink_bounds(g)
-        for r in range(5):
-            row = g[r]
-            c = lo
-            while c <= hi:
-                if row[c] == '#':
-                    px(cx + (c - lo), y + r, color)
-                c += 1
-        cx += w + 1
-    return cx
-def text_width(s):
-    w = 0
-    for ch in str(s).upper():
-        w += ink_bounds(FONT.get(ch, FONT[' ']))[2] + 1
-    return w - 1
-def draw_icon(x, y, name, color):
-    rows = ICONS.get(name)
-    if not rows:
-        return
-    for r in range(len(rows)):
-        row = rows[r]
-        for c in range(len(row)):
-            if row[c] == '#':
-                px(x + c, y + r, color)
+# ---- proportional font (imported from pixelbadge.pixelfont) -----------------
 def bar_left(y, frac, color):
     n = int(min(1.0, frac) * W + 0.5)
     for i in range(n):
@@ -485,7 +231,7 @@ def draw_stat(s):
     if k == 'batsummary':
         avg = fleet_soc()
         col = soc_color(avg)
-        draw_icon(0, 0, 'BATT', col)
+        draw_icon(0, 0, ICONS.get('BATT'), col)
         draw_text(9, 0, '0W', col)
         bar_left(7, avg / 100.0, col)
         return
@@ -499,7 +245,7 @@ def draw_stat(s):
         return
     v = value_of(s)
     col = color_of(s, v)
-    draw_icon(0, 0, s['icon'], col)
+    draw_icon(0, 0, ICONS.get(s['icon']), col)
     draw_text(9, 0, fit_value(fmt(s, v), W - 9), col)
     if k == 'use':
         draw_use_bar(v)         # two-tone: green self-use / purple import / amber export

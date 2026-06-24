@@ -30,7 +30,7 @@ ignore = ["UP031", "UP032"]   # %-formatting is required on the MicroPython badg
 # F401: hub75 kept in guard for ON_BADGE detection; fb/H re-exported as app attrs for tests.
 "app/ha_energy/__init__.py" = ["E401", "E402", "E701", "E702", "E731", "E741", "E501", "I001", "F401"]
 # MicroPython shared lib: grouped hardware guard import is intentional (no f-strings, no hints).
-"lib/pixelbadge/matrix.py" = ["E401", "I001"]
+"lib/pixelbadge/*.py" = ["E401", "E402", "E701", "E702", "E731", "E741", "E501", "I001"]
 
 [tool.ruff.format]
 # Keep the compact, hand-tuned MicroPython layout (font/icon tables) as-is.
