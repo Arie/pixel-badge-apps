@@ -320,11 +320,14 @@ ICONS = {ch: _glyph(a) for ch, a in {
 def _build_stats(c):
     bats, entities, pids = [], {'SOL': c['solar_entity'], 'GRID': c['grid_entity']}, []
     for bc in c['batteries']:
-        label = bc['label']; pid = label + 'P'
+        label = bc.get('label'); soc = bc.get('soc'); power = bc.get('power')
+        if not (label and soc and power):
+            continue                                  # skip malformed battery entries
+        pid = label + 'P'
         bats.append({'id':label, 'label':label, 'kind':'battery',
                      'socId':label, 'powerId':pid, 'powerMax':bc.get('power_max', 800),
                      'weight':bc.get('weight', 1), 'socMin':bc.get('soc_min', 0)})
-        entities[label] = bc['soc']; entities[pid] = bc['power']; pids.append(pid)
+        entities[label] = soc; entities[pid] = power; pids.append(pid)
     flow = [
      {'id':'USE', 'label':'USE', 'icon':'HOME','kind':'use',   'color':PURPLE,'max':c['grid_connection_w']},
      {'id':'SOL', 'label':'SOL', 'icon':'SUN', 'kind':'power', 'color':GREEN, 'max':c['solar_max_w'], 'hideIdle':True},
