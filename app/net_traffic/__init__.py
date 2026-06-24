@@ -358,11 +358,17 @@ def _screens_from_data():
 _COLOR_MAP = {'green': GREEN, 'amber': AMBER, 'red': RED, 'purple': PURPLE}
 
 def _draw_prefix(prefix):
-    """Draw a small prefix label (WAN name) at x=0; returns x offset after prefix."""
+    """WAN tag: one dot per WAN number (1 dot = WAN1, 2 dots = WAN2, ...) in a 1px
+    column at x0. Tiny and unmistakable for a digit. Returns x offset for content."""
     if not prefix:
         return 0
-    x = draw_text(0, 0, prefix[:3], GREY)
-    return x + 1
+    try:
+        n = int(prefix)
+    except ValueError:
+        n = 1
+    for i in range(n):
+        px(0, i * 2, WHITE)          # dots at rows 0, 2, 4, ...
+    return 2
 
 def draw_screen(s):
     """Render one screen into the framebuffer."""
@@ -443,11 +449,7 @@ def draw_screen(s):
         # avg overlay always uses real current pings
         a = avg_ping(pings)
         lbl = avg_label(a)
-        pfx = s.get('prefix', '')
-        ox = 0
-        if pfx:                                  # WAN tag, then the avg (multi-WAN)
-            draw_text_outline(0, 0, pfx, WHITE)
-            ox = text_width(pfx) + 2
+        ox = _draw_prefix(s.get('prefix', ''))   # WAN dot(s), then the avg
         if lbl:
             draw_text_outline(ox, 0, lbl, WHITE)
         return
