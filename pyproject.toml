@@ -37,3 +37,4 @@ exclude = ["app/ha_energy/__init__.py"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["lib"]
