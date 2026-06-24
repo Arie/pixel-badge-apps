@@ -417,9 +417,7 @@ def draw_screen(s):
                 fidx = abs_idx - hist_base
                 v = scroll_sample(buf, fidx)
                 if v < 0:
-                    c_color = PURPLE
-                    if not blink_on: c_color = (0, 0, 0)
-                    px(c, 0, c_color)
+                    px(c, 0, PURPLE)              # steady loss dot (no blink)
                 else:
                     color = GREEN if v < 40 else (AMBER if v < 80 else RED)
                     h = bar_height(v, scale)
@@ -435,9 +433,7 @@ def draw_screen(s):
                     break
                 v = buf[idx]
                 if v < 0:
-                    c_color = PURPLE
-                    if not blink_on: c_color = (0, 0, 0)
-                    px(c, 0, c_color)
+                    px(c, 0, PURPLE)              # steady loss dot (no blink)
                 else:
                     color = GREEN if v < 40 else (AMBER if v < 80 else RED)
                     h = bar_height(v, scale)
