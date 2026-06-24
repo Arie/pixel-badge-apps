@@ -30,6 +30,7 @@ DEFAULTS = {
     'ping_scale_ms': 50,    # ping-graph full-height RTT in ms (fixed scale)
     'rtt_alert_ms': 100,    # RTT at or above this -> alert
     'loss_alert_pct': 1,    # loss% at or above this -> alert
+    'ping_only': False,     # dev: show ONLY the ping screen(s), no rotation
     'ping_animate': True,   # smooth left-scroll on ping screen
     'ping_rate': 5.0,       # samples/sec the producer emits
     'ping_lag': 10,         # jitter-buffer depth in samples
@@ -334,6 +335,10 @@ def _screens_from_data():
         # Graceful no-data placeholder: one conns-style screen
         return [{'id': 'loading', 'kind': 'loading', 'stale': _data['stale']}]
     screens = build_screens(wans, conns)
+    if cfg.get('ping_only'):                  # dev: keep only ping screens
+        only = [s for s in screens if s.get('kind') == 'ping']
+        if only:
+            screens = only
     al = alert_wan(wans, RTT_ALERT, LOSS_ALERT)
     if al:
         # Move alerting wan's ping screen to front
