@@ -37,19 +37,19 @@ def test_fmt_rate_g_large(net_app):
 
 
 def test_fmt_bytes_g(net_app):
-    assert net_app.fmt_bytes(277000000000) == "277G"
+    assert net_app.fmt_bytes(277000000000) == "277GB"
 
 
 def test_fmt_bytes_m(net_app):
-    assert net_app.fmt_bytes(512000000) == "512M"
+    assert net_app.fmt_bytes(512000000) == "512MB"
 
 
 def test_fmt_bytes_k(net_app):
-    assert net_app.fmt_bytes(800000) == "800K"
+    assert net_app.fmt_bytes(800000) == "800KB"
 
 
 def test_fmt_bytes_g_boundary(net_app):
-    assert net_app.fmt_bytes(1000000000) == "1G"
+    assert net_app.fmt_bytes(1000000000) == "1GB"
 
 
 # ---- build_screens -----------------------------------------------------------

@@ -101,12 +101,12 @@ def fmt_rate(bps):
     return str(bps // 1000) + 'K'
 
 def fmt_bytes(n):
-    """Format byte count → compact string: e.g. 277000000000 → '277G'."""
+    """Format byte count → compact string: e.g. 277000000000 → '277GB'."""
     if n >= 1000000000:
-        return str(n // 1000000000) + 'G'
+        return str(n // 1000000000) + 'GB'
     if n >= 1000000:
-        return str(n // 1000000) + 'M'
-    return str(n // 1000) + 'K'
+        return str(n // 1000000) + 'MB'
+    return str(n // 1000) + 'KB'
 
 def build_screens(wans, conns):
     """Build the ordered list of screen dicts from parsed poll data.
@@ -388,8 +388,9 @@ def draw_screen(s):
             bar_left(7, s['bps'] / s['bps_max'], GREEN)
         return
     if k == 'total':
-        col = RED if s.get('dir') == 'down' else GREEN   # match the rate colours
-        draw_icon(0, 0, ICONS['SIGMA'], col)
+        down = s.get('dir') == 'down'
+        col = RED if down else GREEN                     # match the rate colours
+        draw_icon(0, 0, ICONS['DOWN'] if down else ICONS['UP'], col)  # arrow = direction
         draw_text(9, 0, fmt_bytes(s['total']), col)
         return
     if k == 'conns':
