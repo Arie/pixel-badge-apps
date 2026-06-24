@@ -323,29 +323,40 @@ def test_avg_label_no_data(net_app):
     assert net_app.avg_label(-1) == ""
 
 
-# ---- interp_pings ------------------------------------------------------------
+# ---- scroll_sample -----------------------------------------------------------
 
 
-def test_interp_pings_midpoint(net_app):
-    # t=0.5: each column tweens halfway
-    assert net_app.interp_pings([10, 20], [20, 40], 0.5) == [15, 30]
+def test_scroll_sample_midpoint(net_app):
+    # fractional index 0.5 between 10 and 20 → 15
+    assert net_app.scroll_sample([10, 20], 0.5) == 15
 
 
-def test_interp_pings_t0_returns_prev(net_app):
-    # t=0: should return prev when both valid
-    assert net_app.interp_pings([10], [20], 0.0) == [10]
+def test_scroll_sample_integer_index(net_app):
+    # integer index 1.0 → sample at index 1
+    assert net_app.scroll_sample([10, 20, 30], 1.0) == 20
 
 
-def test_interp_pings_t1_returns_new(net_app):
-    # t=1: should return new
-    assert net_app.interp_pings([10], [20], 1.0) == [20]
+def test_scroll_sample_exact_last(net_app):
+    # integer index at last element
+    assert net_app.scroll_sample([10, 20, 30], 2.0) == 30
 
 
-def test_interp_pings_loss_pops(net_app):
-    # loss sentinel (-1) on either side -> pop to new[i], no tween
-    assert net_app.interp_pings([10, -1], [-1, 20], 0.5) == [-1, 20]
+def test_scroll_sample_past_end_clamps(net_app):
+    # index 1.9 in a 2-element list: b clamps to a → ~20
+    result = net_app.scroll_sample([10, 20], 1.9)
+    assert result == 20
 
 
-def test_interp_pings_shorter_prev(net_app):
-    # prev shorter than new: missing entries treated as equal to new (no tween)
-    assert net_app.interp_pings([10], [20, 30], 0.5) == [15, 30]
+def test_scroll_sample_loss_nearest_frac_above_half(net_app):
+    # frac=0.6 → nearest is b (index 1) = -1 → loss
+    assert net_app.scroll_sample([10, -1], 0.6) == -1
+
+
+def test_scroll_sample_loss_nearest_frac_below_half(net_app):
+    # frac=0.4 → nearest is a (index 0) = -1 → loss
+    assert net_app.scroll_sample([-1, 20], 0.4) == -1
+
+
+def test_scroll_sample_loss_neighbour_skipped(net_app):
+    # frac=0.0 → nearest is a=10 (not loss); b=-1 is skipped → return a
+    assert net_app.scroll_sample([10, -1], 0.0) == 10

@@ -26,10 +26,11 @@ DEFAULTS = {
     'poll_seconds': 1,
     'brightness': 10,
     'auto_advance_seconds': 2.5,
+    'ping_dwell_seconds': 12,
     'ping_scale_ms': 50,    # ping-graph full-height RTT in ms (fixed scale)
     'rtt_alert_ms': 100,    # RTT at or above this -> alert
     'loss_alert_pct': 5,    # loss% at or above this -> alert
-    'ping_animate': True,   # smooth height-tween between polls on ping screen
+    'ping_animate': True,   # smooth left-scroll on ping screen
 }
 try:
     with open('apps/net_traffic/config.json') as f:
@@ -41,9 +42,12 @@ cfg.update(CFG)
 
 POLL_MS = int(cfg['poll_seconds']) * 1000
 ADV_MS = int(cfg['auto_advance_seconds'] * 1000)
+PING_DWELL_MS = int(cfg['ping_dwell_seconds'] * 1000)
 PING_SCALE = int(cfg['ping_scale_ms'])
 RTT_ALERT = int(cfg['rtt_alert_ms'])
 LOSS_ALERT = int(cfg['loss_alert_pct'])
+# Number of new samples per poll (router pings ~5/sec, badge polls at 1Hz)
+SCROLL_N = max(1, int(round(cfg['poll_seconds'] * 5)))
 
 # ---- colours ----------------------------------------------------------------
 GREEN  = (0x2e, 0xd6, 0x40)   # download
@@ -195,29 +199,28 @@ def avg_label(a):
         return "%dMS" % a
     return "%d" % a
 
-def interp_pings(prev, new, t):
-    """Interpolate ping values for smooth animation (pure, host-testable).
+def scroll_sample(combined, src):
+    """Sample the combined ping buffer at fractional index src for smooth scrolling.
 
-    Returns a new list same length as new.
-    For each index i:
-      - if prev[i] >= 0 and new[i] >= 0: tween (int round)
-      - else: return new[i] directly (loss/value transitions pop)
-    If prev is shorter than new, missing entries are treated as equal to new
-    (no tween for those columns).
-    t is clamped by the caller to [0,1].
+    Interpolates between adjacent integer samples. Loss handling:
+      - If the nearest sample (by fractional distance) is a loss (-1), return -1.
+      - If only one neighbour is a loss, return the non-loss neighbour (no interp).
+      - Otherwise linearly interpolate and round.
+    Past-end indices clamp to the last element.
     """
-    result = []
-    for i in range(len(new)):
-        n = new[i]
-        if i < len(prev):
-            p = prev[i]
-        else:
-            p = n          # no prev -> no tween
-        if p >= 0 and n >= 0:
-            result.append(int(round(p + (n - p) * t)))
-        else:
-            result.append(n)
-    return result
+    i = int(src)
+    if i < 0: i = 0
+    frac = src - i
+    a = combined[i] if i < len(combined) else combined[-1]
+    b = combined[i + 1] if i + 1 < len(combined) else a
+    near = a if frac < 0.5 else b
+    if near < 0:            # nearest sample is a loss -> loss column
+        return -1
+    if a < 0:
+        return b
+    if b < 0:
+        return a
+    return int(round(a * (1.0 - frac) + b * frac))
 
 def draw_text_outline(x, y, s, color):
     """Draw text s at (x, y) with a 1px black outline for readability.
@@ -234,30 +237,33 @@ def draw_text_outline(x, y, s, color):
 # ---- poll data storage ------------------------------------------------------
 _data = {'wans': [], 'conns': None, 'stale': True}
 
-# Per-iface ping history for animation tweening.
-# prev_pings[iface] = pings list from the poll before last
-# cur_pings[iface]  = pings list from the most recent poll
-# last_poll_ms      = time.ticks_ms() at the moment of the last successful poll
-prev_pings = {}
-cur_pings  = {}
+# Per-iface scroll state for smooth left-scroll animation.
+# shown_pings[iface] = the 32-wide window of pings currently being scrolled across
+# combined[iface]    = shown_pings (pre-scroll) + new SCROLL_N samples (length 32+SCROLL_N)
+# last_poll_ms       = time.ticks_ms() at the moment of the last successful poll
+shown_pings = {}
+combined = {}
 last_poll_ms = 0
 
 def poll():
     """Fetch /cgi-bin/traffic and update _data. On any error: keep last-good, set stale."""
-    global _data, prev_pings, cur_pings, last_poll_ms
+    global _data, shown_pings, combined, last_poll_ms
     try:
         r = requests.get(cfg['base_url'] + '/cgi-bin/traffic')
         d = r.json(); r.close()
         new_wans = d.get('wans', [])
-        # Rotate ping history before overwriting
+        # Build scroll buffers before overwriting
         for wan in new_wans:
             iface = wan['iface']
-            new_p = wan.get('pings', [])
-            if iface in cur_pings:
-                prev_pings[iface] = cur_pings[iface]
+            newer = wan.get('pings', [])
+            if iface in shown_pings:
+                # Append the SCROLL_N newest samples to the right of the shown window
+                combined[iface] = list(shown_pings[iface]) + list(newer[-SCROLL_N:])
+                shown_pings[iface] = newer
             else:
-                prev_pings[iface] = new_p   # first poll: prev == new, t irrelevant
-            cur_pings[iface] = new_p
+                # First poll: no scroll yet, show the current pings directly
+                shown_pings[iface] = newer
+                combined[iface] = newer
         last_poll_ms = time.ticks_ms()
         _data['wans'] = new_wans
         _data['conns'] = d.get('conns', None)
@@ -328,35 +334,42 @@ def draw_screen(s):
         draw_text(9, 0, str(s['conns']), PURPLE)
         return
     if k == 'ping':
-        # full-width sparkline: 32 columns, newest entry at rightmost column
+        # full-width sparkline: 32 columns, smooth left-scroll animation
         pings = s['pings']
         n = len(pings)
         if n == 0:
             draw_text(0, 1, 'PING', GREY)
             draw_text(0, 4, '---', GREY)
             return
-        # Compute tween fraction t in [0, 1]
         iface = s.get('iface', '')
-        if cfg.get('ping_animate') and iface in cur_pings and iface in prev_pings:
-            now_ms = time.ticks_ms()
-            elapsed = time.ticks_diff(now_ms, last_poll_ms)
-            t = min(1.0, elapsed / float(POLL_MS))
-            draw_pings = interp_pings(prev_pings[iface], cur_pings[iface], t)
-        else:
-            draw_pings = pings
-        # pad so newest is at x=31
-        start_x = max(0, W - n)
-        visible = draw_pings[max(0, n - W):]
         scale = cfg['ping_scale_ms']
-        cols = ping_columns(visible, scale)
-        for i, ops in enumerate(cols):
-            x = start_x + i
-            for (row, color_key) in ops:
-                c = _COLOR_MAP.get(color_key, GREY)
-                if color_key == 'purple' and not blink_on:
-                    c = (0, 0, 0)    # blink the loss dot
-                px(x, row, c)
-        # avg overlay always uses real (cur) pings
+        # Determine the combined buffer and scroll offset
+        if cfg.get('ping_animate') and iface in combined:
+            now = time.ticks_ms()
+            t = time.ticks_diff(now, last_poll_ms) / float(POLL_MS)
+            if t < 0.0: t = 0.0
+            if t > 1.0: t = 1.0
+            f = t * SCROLL_N
+            buf = combined[iface]
+        else:
+            # Static: show the combined buffer at f=0 (leftmost window)
+            f = 0.0
+            buf = combined[iface] if iface in combined else pings
+        # Render 32 columns using fractional-index sampling
+        for c in range(W):
+            v = scroll_sample(buf, c + f)
+            if v < 0:
+                # Loss: purple dot at row 0
+                c_color = PURPLE
+                if not blink_on:
+                    c_color = (0, 0, 0)
+                px(c, 0, c_color)
+            else:
+                level = round(min(v, scale) / scale * 6)
+                row = 7 - max(0, min(6, level))
+                color = GREEN if v < 40 else (AMBER if v < 80 else RED)
+                px(c, row, color)
+        # avg overlay always uses real current pings
         a = avg_ping(pings)
         lbl = avg_label(a)
         if lbl:
@@ -429,9 +442,12 @@ class Display:
             self.car.step(state['nav']); state['nav'] = 0
             self.last_adv = self.touched = now
             self.dirty = True
-        elif not state['paused'] and time.ticks_diff(now, self.last_adv) >= ADV_MS:
-            self.car.step(1); self.last_adv = now
-            self.dirty = True
+        elif not state['paused']:
+            # Use longer dwell on ping screens
+            dwell = PING_DWELL_MS if self._is_ping_screen() else ADV_MS
+            if time.ticks_diff(now, self.last_adv) >= dwell:
+                self.car.step(1); self.last_adv = now
+                self.dirty = True
 
     def _is_ping_screen(self):
         """True if the current screen is a ping screen."""
