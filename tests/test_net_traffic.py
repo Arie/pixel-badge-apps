@@ -453,3 +453,35 @@ def test_poll_seq_delta_clamps_n_new_to_len_newer(net_app):
 
     assert len(net_app.hist[iface]) == 5
     assert net_app.hist[iface][-2:] == [4, 5]
+
+
+# ---- bar_height --------------------------------------------------------------
+
+
+def test_bar_height_zero_gives_minimum_1(net_app):
+    # 0 ms → minimum bar height of 1 (not 0)
+    assert net_app.bar_height(0, 50) >= 1
+
+
+def test_bar_height_full_scale_gives_6(net_app):
+    # at full scale → height 6 (top of bar area)
+    assert net_app.bar_height(50, 50) == 6
+
+
+def test_bar_height_half_scale_near_3(net_app):
+    # 25 ms at scale 50 → round(25/50*6) = round(3.0) = 3
+    assert net_app.bar_height(25, 50) == 3
+
+
+def test_bar_height_clamps_above_scale(net_app):
+    # rtt above scale clamps to 6
+    assert net_app.bar_height(200, 50) == 6
+
+
+def test_bar_height_small_value(net_app):
+    # 4 ms at scale 50 → round(4/50*6) = round(0.48) = 0 → clamped to min 1
+    assert net_app.bar_height(4, 50) == 1
+
+
+def test_bar_height_returns_int(net_app):
+    assert isinstance(net_app.bar_height(25, 50), int)

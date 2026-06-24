@@ -32,7 +32,7 @@ DEFAULTS = {
     'loss_alert_pct': 5,    # loss% at or above this -> alert
     'ping_animate': True,   # smooth left-scroll on ping screen
     'ping_rate': 5.0,       # samples/sec the producer emits
-    'ping_lag': 4,          # jitter-buffer depth in samples
+    'ping_lag': 10,         # jitter-buffer depth in samples
 }
 try:
     with open('apps/net_traffic/config.json') as f:
@@ -200,6 +200,15 @@ def avg_label(a):
     if a < 100:
         return "%dMS" % a
     return "%d" % a
+
+def bar_height(v, scale):
+    """Return filled-bar height in pixels for a ping RTT value v.
+
+    Height 1..6 growing up from the bottom (row 7 is the base row, row 2 is max).
+    v=0 → h=1 (minimum visible bar), v>=scale → h=6.
+    Does NOT handle loss (v<0); caller should check that first.
+    """
+    return max(1, int(round(min(v, scale) / scale * 6)))
 
 def scroll_sample(combined, src):
     """Sample the combined ping buffer at fractional index src for smooth scrolling.
@@ -412,10 +421,10 @@ def draw_screen(s):
                     if not blink_on: c_color = (0, 0, 0)
                     px(c, 0, c_color)
                 else:
-                    level = round(min(v, scale) / scale * 6)
-                    row = 7 - max(0, min(6, level))
                     color = GREEN if v < 40 else (AMBER if v < 80 else RED)
-                    px(c, row, color)
+                    h = bar_height(v, scale)
+                    for r in range(h):
+                        px(c, 7 - r, color)
         else:
             # Static path: draw the last 32 of hist (or raw pings) at integer positions
             buf = hist[iface] if iface in hist else pings
@@ -430,10 +439,10 @@ def draw_screen(s):
                     if not blink_on: c_color = (0, 0, 0)
                     px(c, 0, c_color)
                 else:
-                    level = round(min(v, scale) / scale * 6)
-                    row = 7 - max(0, min(6, level))
                     color = GREEN if v < 40 else (AMBER if v < 80 else RED)
-                    px(c, row, color)
+                    h = bar_height(v, scale)
+                    for r in range(h):
+                        px(c, 7 - r, color)
         # avg overlay always uses real current pings
         a = avg_ping(pings)
         lbl = avg_label(a)
