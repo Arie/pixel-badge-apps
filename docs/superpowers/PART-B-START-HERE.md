@@ -5,14 +5,13 @@ Part A (shared `pixelbadge` lib) is **done + on-device** (commits `9608d78..6c76
 
 Start a **fresh session** and work these in order:
 
-## 1. Resolve open design questions (decisions block the plan)
-- **Re-probe the party router** when online: `ssh -p 10022 root@192.168.1.159 ...`
-  (or the real `192.168.99.1:22`). Confirm: python3? conntrack? `/proc/net/dev`
-  WAN iface name(s)? package manager (apk vs opkg)? The dev router
-  (`root@192.168.1.1`) is SNAPSHOT x86/64 with uhttpd + cgi-bin, python3, jsonfilter,
-  WAN `pppoe-ppp0` (+`pppoe-ppp1`), no conntrack, `/etc/sysupgrade.conf` persistence.
+## 1. Open design questions
+- **Routers probed (both OpenWRT SNAPSHOT x86/64, uhttpd+cgi-bin, python3+lua+jsonfilter, apk):**
+  - Dev `root@192.168.1.1`: WAN `pppoe-ppp0` (+`pppoe-ppp1`); **no conntrack** (proc absent); sysupgrade keeps `/root/`.
+  - Party `root@192.168.1.157 -p 10022`: WAN `eth3` (plain ethernet); **`/proc/net/nf_conntrack` PRESENT** (conns feasible here); sysupgrade keeps `/root/`. (At the actual party the WAN may be `192.168.99.1`/different iface.)
+  - **Implications:** WAN iface differs per router → the CGI WAN list **must be config-driven**, never hardcoded. conntrack differs → emit `conns` **conditionally** (only if `/proc/net/nf_conntrack` exists). python3 is on both, so a python CGI is viable; shell is still the most portable choice for embedded routers — decide in the CGI plan.
+  - Neither keeps `/www` across sysupgrade → add the CGI's path to `/etc/sysupgrade.conf`.
 - **Total-data source:** live `vnstat` (apk add) vs accumulate counters vs drop for v1.
-- **Active connections:** install conntrack (apk add) vs defer.
 
 ## 2. Display mockup pass (like the energy app)
 Multi-WAN layout on 32x8 + the latency/loss **alert-override** (bad WAN jumps to
