@@ -29,7 +29,7 @@ DEFAULTS = {
     'ping_dwell_seconds': 12,
     'ping_scale_ms': 50,    # ping-graph full-height RTT in ms (fixed scale)
     'rtt_alert_ms': 100,    # RTT at or above this -> alert
-    'loss_alert_pct': 5,    # loss% at or above this -> alert
+    'loss_alert_pct': 1,    # loss% at or above this -> alert
     'ping_animate': True,   # smooth left-scroll on ping screen
     'ping_rate': 5.0,       # samples/sec the producer emits
     'ping_lag': 10,         # jitter-buffer depth in samples
@@ -344,7 +344,6 @@ def _screens_from_data():
     return screens
 
 # ---- render -----------------------------------------------------------------
-blink_on = True
 
 _COLOR_MAP = {'green': GREEN, 'amber': AMBER, 'red': RED, 'purple': PURPLE}
 
@@ -410,14 +409,17 @@ def draw_screen(s):
                 play_pos[iface], newest, hist_base,
                 cfg['ping_rate'], dt, cfg['ping_lag'])
             buf = hist[iface]
-            pp = play_pos[iface]
-            # Render 32 columns: column c maps to absolute index pp-(31-c)
+            # Snap the window to integer sample positions: exact bars, no height
+            # interpolation -> no morph/duplication. The bars step one column at a
+            # time as play_pos crosses integers (~data rate), driven smoothly.
+            ipp = int(round(play_pos[iface]))
             for c in range(W):
-                abs_idx = pp - (31 - c)
-                fidx = abs_idx - hist_base
-                v = scroll_sample(buf, fidx)
+                idx = ipp - (31 - c) - hist_base
+                if idx < 0 or idx >= len(buf):
+                    continue
+                v = buf[idx]
                 if v < 0:
-                    px(c, 0, PURPLE)              # steady loss dot (no blink)
+                    px(c, 0, PURPLE)              # steady loss dot
                 else:
                     color = GREEN if v < 40 else (AMBER if v < 80 else RED)
                     h = bar_height(v, scale)
@@ -489,7 +491,6 @@ class Display:
         self.bright = state['bright']
         self.last_poll = self.last_adv = self.touched = time.ticks_ms()
         self.dirty = True
-        self.prev_blink = False
         self.alerting = False
 
     def _brightness(self, now):
@@ -504,7 +505,14 @@ class Display:
             self.last_poll = now
             new_screens = _screens_from_data()
             self.car.refresh(new_screens)
-            self.alerting = _is_alerting()
+            al = alert_wan(_data['wans'], RTT_ALERT, LOSS_ALERT)
+            was = self.alerting
+            self.alerting = al is not None
+            if al and not was:                    # surface the alerting wan once...
+                ping_id = '%s:ping' % al
+                if self.car.cur_id != ping_id:    # ...unless it's already at the front
+                    self.car.cur_id = ping_id
+                    self.last_adv = now
             self.dirty = True
 
     def _select(self, now):
@@ -525,11 +533,6 @@ class Display:
         return s.get('kind') == 'ping'
 
     def _draw(self, now):
-        global blink_on
-        blink_on = (now // 450) % 2 == 0
-        if self.alerting and blink_on != self.prev_blink:
-            self.dirty = True         # animate the alert blink
-        self.prev_blink = blink_on
         # Ping-animate: bypass dirty gate; always render at ~14fps
         if cfg.get('ping_animate') and self._is_ping_screen():
             try:
