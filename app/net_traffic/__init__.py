@@ -263,8 +263,8 @@ def draw_text_outline(x, y, s, color):
     color at (x, y) on top. Off-screen pixels (e.g. x=-1) are clipped by px.
     """
     BLACK = (0, 0, 0)
-    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1),
-                   (-1, -1), (1, -1), (-1, 1), (1, 1)):
+    for dx, dy in ((-1, 0), (1, 0), (0, -1),     # left, right, top
+                   (-1, -1), (1, -1)):           # top corners (no bottom border)
         draw_text(x + dx, y + dy, s, BLACK)
     draw_text(x, y, s, color)
 

@@ -143,8 +143,9 @@ ssh root@192.168.1.1 'chmod +x /tmp/traffic-faker;
   start-stop-daemon -S -b -m -p /tmp/faker.pid -x /bin/sh -- /tmp/traffic-faker pppoe-ppp0'
 ```
 
-To restore real pings: `pkill -f traffic-faker; /etc/init.d/traffic-pinger enable; /etc/init.d/traffic-pinger start`.
+To restore real pings (kill any faker awk + start the service):
+`for p in $(pgrep -f traffic_ping_); do grep -qa awk /proc/$p/cmdline && kill -9 $p; done; /etc/init.d/traffic-pinger enable; /etc/init.d/traffic-pinger start`
 
-> NOTE (current dev state of `192.168.1.1`): the real pinger is **stopped + disabled**
-> and the faker is running from `/tmp` (lost on router reboot). Re-enable the pinger
-> when done developing the graph.
+The real `traffic-pinger` is the default; the faker is only for graph development.
+The pinger emits ~5 samples/sec (5 pings then `sleep 1`, since busybox lacks
+sub-second sleep) to match the badge's `ping_rate`.
