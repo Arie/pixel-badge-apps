@@ -182,6 +182,17 @@ def avg_ping(pings):
         return -1
     return int(round(total / count))
 
+def auto_scale_ms(pings, fallback):
+    """Return a dynamic full-scale value so the average ping sits at mid-height.
+
+    full-scale = max(2 * avg, 10).  Floor of 10 ms avoids over-amplifying
+    near-zero latency.  Falls back to `fallback` when there is no non-loss data.
+    """
+    a = avg_ping(pings)
+    if a > 0:
+        return max(2 * a, 10)
+    return fallback
+
 # ---- poll data storage ------------------------------------------------------
 _data = {'wans': [], 'conns': None, 'stale': True}
 
@@ -270,7 +281,8 @@ def draw_screen(s):
         # pad so newest is at x=31
         start_x = max(0, W - n)
         visible = pings[max(0, n - W):]
-        cols = ping_columns(visible, PING_SCALE)
+        scale = auto_scale_ms(pings, cfg['ping_scale_ms'])
+        cols = ping_columns(visible, scale)
         for i, ops in enumerate(cols):
             x = start_x + i
             for (row, color_key) in ops:

@@ -266,3 +266,40 @@ def test_avg_ping_all_loss(net_app):
 
 def test_avg_ping_empty(net_app):
     assert net_app.avg_ping([]) == -1
+
+
+# ---- auto_scale_ms -----------------------------------------------------------
+
+
+def test_auto_scale_ms_average_20(net_app):
+    # avg([20,20,20]) = 20  → max(2*20, 10) = 40
+    assert net_app.auto_scale_ms([20, 20, 20], 30) == 40
+
+
+def test_auto_scale_ms_flat_4(net_app):
+    # avg([4,4,4]) = 4  → max(2*4, 10) = max(8, 10) = 10
+    assert net_app.auto_scale_ms([4, 4, 4], 30) == 10
+
+
+def test_auto_scale_ms_all_loss(net_app):
+    # no non-loss data → returns fallback
+    assert net_app.auto_scale_ms([-1, -1], 30) == 30
+
+
+def test_auto_scale_ms_empty(net_app):
+    # empty list → returns fallback
+    assert net_app.auto_scale_ms([], 30) == 30
+
+
+def test_auto_scale_ms_mixed_losses(net_app):
+    # avg of non-loss only: (10+30)/2 = 20  → max(40, 10) = 40
+    assert net_app.auto_scale_ms([-1, 10, -1, 30], 30) == 40
+
+
+def test_auto_scale_ms_bar_at_mid_height(net_app):
+    # For [4,4,4] auto_scale=10; bar height = max(1, round(4/10*7)) = max(1,3) = 3
+    # Mid-height of 7-px range is 3.5, so height 3 or 4 is acceptable (near middle)
+    scale = net_app.auto_scale_ms([4, 4, 4], 30)  # → 10
+    cols = net_app.ping_columns([4], scale)
+    h = len(cols[0])
+    assert 3 <= h <= 4, "expected bar near mid-height (3-4 px), got %d" % h
