@@ -438,6 +438,31 @@ def gauge(s, v, col):
     else:
         bar_left(7, frac, col)      # always from the left; colour shows the sign
 
+USE_SCALE = 6000        # USE bar full-scale (solar inverter max); above this it just fills
+
+def use_segments(usage, solar):
+    """Split into (self-use, grid-import, export) watts: solar used at home,
+    the rest of usage drawn from the grid, and any solar beyond usage exported."""
+    self_w = solar if solar < usage else usage
+    return (self_w, usage - self_w, solar - self_w)
+
+def draw_use_bar(usage):
+    if usage > 17250:                          # boost beyond the grid connection
+        if blink_on:
+            bar_left(7, 1.0, ALERT)
+        return
+    solar = VALUES.get('SOL', 0)
+    self_w, _imp, _exp = use_segments(usage, solar)
+    end_self = int(min(1.0, self_w / USE_SCALE) * W + 0.5)   # solar used at home (green)
+    end_imp  = int(min(1.0, usage  / USE_SCALE) * W + 0.5)   # ...then grid import (purple)
+    end_exp  = int(min(1.0, solar  / USE_SCALE) * W + 0.5)   # ...or solar export (amber)
+    for i in range(end_self):
+        px(i, 7, GREEN)
+    for i in range(end_self, end_imp):
+        px(i, 7, PURPLE)
+    for i in range(end_imp, end_exp):
+        px(i, 7, AMBER)
+
 def draw_stat(s):
     k = s['kind']
     if k == 'batsummary':
@@ -459,7 +484,10 @@ def draw_stat(s):
     col = color_of(s, v)
     draw_icon(0, 0, s['icon'], col)
     draw_text(9, 0, fit_value(fmt(s, v), W - 9), col)
-    gauge(s, v, col)
+    if k == 'use':
+        draw_use_bar(v)         # two-tone: green self-use / purple import / amber export
+    else:
+        gauge(s, v, col)
 
 # ---- active list (idle filter + BAT summary) --------------------------------
 def is_active(s):

@@ -48,7 +48,20 @@
     const v = C.value(s), col = C.colorOf(s, v);
     matrix.icon(b, 0, 0, s.icon, col);
     PF.drawText(b, 9, 0, fitValue(C.fmt(s, v), 32 - 9), col);
-    gauge(matrix, b, s, v, col);
+    if (s.kind === 'use') useBar(matrix, b, v, C.solarW());  // green self / purple import / amber export
+    else gauge(matrix, b, s, v, col);
+  }
+
+  // USE bar: 6kW full-scale, split green (solar→home) / purple (grid→home) / amber (export).
+  function useBar(matrix, b, usage, solar) {
+    if (usage > 17250) { if (Blink.on) matrix.barLeft(b, 7, 1, C.COLORS.alert); return; }
+    const SCALE = 6000, self = Math.min(usage, solar);
+    const es = Math.round(Math.min(1, self / SCALE) * 32);
+    const ei = Math.round(Math.min(1, usage / SCALE) * 32);
+    const ex = Math.round(Math.min(1, solar / SCALE) * 32);
+    for (let i = 0; i < es; i++) PF.setPixel(b, i, 7, C.COLORS.solar);
+    for (let i = es; i < ei; i++) PF.setPixel(b, i, 7, C.COLORS.consumption);
+    for (let i = ei; i < ex; i++) PF.setPixel(b, i, 7, C.COLORS.surplus);
   }
 
   function renderInto(matrix, s) {

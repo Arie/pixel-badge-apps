@@ -10,6 +10,7 @@
     charge:      '#5518cc', // battery charging = drawing power (like consumption) → purple
     discharge:   '#2ed640', // battery discharging = supplying power (like export) → green
     alert:       '#ff2a2a', // blinking-red overflow above rated maximum
+    surplus:     '#ff9d3a', // amber — solar exported (USE bar overshoot past usage)
     socHigh:     '#2ed640', socMid: '#ff9d3a', socLow: '#ff4d4d'
   };
 
@@ -110,5 +111,7 @@
     return fmtPower(v, isSigned(stat));
   }
 
-  global.EnergyConfig = { COLORS, MAX, MODES, STATS, value, colorOf, socColor, powerColor, isSigned, fmt, fmtPower, fmtBat, isActive, activeStats, BATSUM, displaySoc, fleetSoc };
+  function solarW() { return value(STATS.filter(s => s.id === 'SOL')[0]); }
+
+  global.EnergyConfig = { COLORS, MAX, MODES, STATS, value, colorOf, socColor, powerColor, isSigned, fmt, fmtPower, fmtBat, isActive, activeStats, BATSUM, displaySoc, fleetSoc, solarW };
 })(window);

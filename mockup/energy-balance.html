@@ -25,6 +25,10 @@
   <p class="note">Green = solar covering the house, purple tail = grid import, green overshoot past usage = export.</p>
   <div class="grid" id="optB"></div>
 
+  <h2>Export colour options (solar &gt; usage = 1.5kW used, 3.5kW solar)</h2>
+  <p class="note">Self-use stays green, the export overshoot tries a different colour each tile.</p>
+  <div class="grid" id="exp"></div>
+
   <script src="./pixelfont.js"></script>
   <script src="./matrix.js"></script>
   <script>
@@ -47,7 +51,7 @@
     function optA(parent, usage, solar, cap){
       const m=tile(parent,cap), b=M.blank();
       icon(b,HOME,PURPLE);
-      PF.drawText(b,9,1,fmt(usage),PURPLE);
+      PF.drawText(b,9,0,fmt(usage),PURPLE);
       for(let i=0;i<col(usage);i++) px(b,i,7,PURPLE);   // usage bar
       const sx=col(solar);                              // solar marker (raised tick, rows 6-7)
       px(b,sx,7,GREEN); px(b,sx,6,GREEN);
@@ -56,7 +60,7 @@
     function optB(parent, usage, solar, cap){
       const m=tile(parent,cap), b=M.blank();
       icon(b,HOME,PURPLE);
-      PF.drawText(b,9,1,fmt(usage),PURPLE);
+      PF.drawText(b,9,0,fmt(usage),PURPLE);
       const u=col(usage), s=col(solar), self=Math.min(u,s);
       for(let i=0;i<self;i++) px(b,i,7,GREEN);          // solar covering the house
       for(let i=self;i<u;i++) px(b,i,7,PURPLE);         // grid import (usage beyond solar)
@@ -69,6 +73,21 @@
                  [1500,3500,'exporting 2.0kW (solar > usage)']];
     cases.forEach(([u,s,c])=>optA(A,u,s,c));
     cases.forEach(([u,s,c])=>optB(B,u,s,c));
+
+    // export-colour comparison: usage 1.5kW, solar 3.5kW
+    function expTile(parent, color, cap){
+      const m=tile(parent,cap), b=M.blank(), usage=1500, solar=3500;
+      icon(b,HOME,PURPLE);
+      PF.drawText(b,9,0,fmt(usage),PURPLE);
+      const u=col(usage), s=col(solar);
+      for(let i=0;i<u;i++) px(b,i,7,GREEN);            // self-use (solar→house)
+      for(let i=u;i<s;i++) px(b,i,7,color);            // export overshoot
+      m.paint(b);
+    }
+    const E=document.getElementById('exp');
+    [['#4fc3ff','light blue'],['#2fe6c8','cyan/teal'],['#ffd000','solar yellow'],
+     ['#ff9d3a','amber'],['#ffffff','white'],['#8cff3a','lime']]
+      .forEach(([c,name])=>expTile(E,c,name));
   </script>
 </body>
 </html>
