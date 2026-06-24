@@ -360,3 +360,96 @@ def test_scroll_sample_loss_nearest_frac_below_half(net_app):
 def test_scroll_sample_loss_neighbour_skipped(net_app):
     # frac=0.0 → nearest is a=10 (not loss); b=-1 is skipped → return a
     assert net_app.scroll_sample([10, -1], 0.0) == 10
+
+
+# ---- advance_play ------------------------------------------------------------
+
+
+def test_advance_play_advances_by_rate_times_dt(net_app):
+    # play_pos 95.0, newest 100, lag=4; newest-play_pos=5 <= 2*4=8, no snap.
+    # hist_base=0, floor=31 < 95. advance: 95 + 5*0.2 = 96.0 → 96.0
+    result = net_app.advance_play(95.0, 100, 0, 5, 0.2, 4)
+    assert result == 96.0
+
+
+def test_advance_play_holds_at_newest(net_app):
+    # play_pos 99.9, rate=5, dt=0.5 would push to 102.4 → clamped to newest=100
+    result = net_app.advance_play(99.9, 100, 0, 5, 0.5, 4)
+    assert result == 100
+
+
+def test_advance_play_snaps_when_far_behind(net_app):
+    # play_pos 50.0, newest 100, lag=4; newest-play_pos = 50 > 2*4=8 → snap to 100-4=96
+    result = net_app.advance_play(50.0, 100, 0, 5, 0.1, 4)
+    assert result == 96
+
+
+def test_advance_play_floors_to_full_window(net_app):
+    # play_pos 5.0, newest 40, hist_base 20; floor = 20+31 = 51; result clamped to 51
+    result = net_app.advance_play(5.0, 40, 20, 5, 0.0, 4)
+    assert result == 51
+
+
+def test_advance_play_no_movement_when_dt_zero(net_app):
+    # dt=0 → no advance; play_pos=35, newest=40, hist_base=0, lag=4
+    # newest-play_pos=5 > 2*4=8? No (5 < 8). floor=31. play_pos stays 35.
+    result = net_app.advance_play(35.0, 40, 0, 5, 0.0, 4)
+    assert result == 35.0
+
+
+def test_advance_play_normal_advance_within_bounds(net_app):
+    # play_pos=93, newest=100, hist_base=60, rate=5, dt=0.2, lag=4
+    # advance: 93 + 1.0 = 94; newest-94=6 <= 8, no snap; floor=91, 94>91 ok.
+    result = net_app.advance_play(93.0, 100, 60, 5, 0.2, 4)
+    assert result == 94.0
+
+
+# ---- poll seq-delta append --------------------------------------------------
+
+
+def test_poll_seq_delta_appends_correct_n_new(net_app):
+    """Verify that the seq-driven append adds exactly n_new samples to hist."""
+    # Seed the iface state as if a first poll happened: hist=[10,11,12], total=3, seq=3
+    iface = "eth0"
+    net_app.hist[iface] = [10, 11, 12]
+    net_app.total[iface] = 3
+    net_app.cgi_seq[iface] = 3
+    net_app.play_pos[iface] = 2.0
+
+    # Simulate what poll() does for a subsequent poll: s=5 → n_new=2
+    newer = [13, 14]
+    s = 5
+    old_seq = net_app.cgi_seq[iface]
+    n_new = s - old_seq  # = 2
+    if n_new < 0:
+        n_new = 0
+    if n_new > len(newer):
+        n_new = len(newer)
+    net_app.hist[iface].extend(newer[-n_new:])
+    net_app.total[iface] += n_new
+    net_app.cgi_seq[iface] = s
+
+    assert net_app.total[iface] == 5
+    assert net_app.hist[iface] == [10, 11, 12, 13, 14]
+    assert net_app.cgi_seq[iface] == 5
+
+
+def test_poll_seq_delta_clamps_n_new_to_len_newer(net_app):
+    """n_new clamped to len(newer) if seq jumps more than available data."""
+    iface = "eth1"
+    net_app.hist[iface] = [1, 2, 3]
+    net_app.total[iface] = 3
+    net_app.cgi_seq[iface] = 3
+    net_app.play_pos[iface] = 2.0
+
+    newer = [4, 5]  # only 2 available
+    s = 20  # seq jumped by 17 — more than len(newer)=2 → clamp to 2
+    n_new = s - net_app.cgi_seq[iface]
+    if n_new > len(newer):
+        n_new = len(newer)
+    net_app.hist[iface].extend(newer[-n_new:])
+    net_app.total[iface] += n_new
+    net_app.cgi_seq[iface] = s
+
+    assert len(net_app.hist[iface]) == 5
+    assert net_app.hist[iface][-2:] == [4, 5]

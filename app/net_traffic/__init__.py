@@ -31,6 +31,8 @@ DEFAULTS = {
     'rtt_alert_ms': 100,    # RTT at or above this -> alert
     'loss_alert_pct': 5,    # loss% at or above this -> alert
     'ping_animate': True,   # smooth left-scroll on ping screen
+    'ping_rate': 5.0,       # samples/sec the producer emits
+    'ping_lag': 4,          # jitter-buffer depth in samples
 }
 try:
     with open('apps/net_traffic/config.json') as f:
@@ -46,8 +48,8 @@ PING_DWELL_MS = int(cfg['ping_dwell_seconds'] * 1000)
 PING_SCALE = int(cfg['ping_scale_ms'])
 RTT_ALERT = int(cfg['rtt_alert_ms'])
 LOSS_ALERT = int(cfg['loss_alert_pct'])
-# Number of new samples per poll (router pings ~5/sec, badge polls at 1Hz)
-SCROLL_N = max(1, int(round(cfg['poll_seconds'] * 5)))
+# Maximum history depth kept per iface (oldest→newest ring)
+HIST_MAX = 96
 
 # ---- colours ----------------------------------------------------------------
 GREEN  = (0x2e, 0xd6, 0x40)   # download
@@ -222,6 +224,28 @@ def scroll_sample(combined, src):
         return a
     return int(round(a * (1.0 - frac) + b * frac))
 
+def advance_play(play_pos, newest, hist_base, rate, dt, lag):
+    """Advance the playhead at constant rate, clamped to the jitter buffer.
+
+    play_pos  - current float absolute-index of the rightmost displayed sample
+    newest    - absolute index of the latest sample in hist (= total - 1)
+    hist_base - absolute index of the oldest sample in hist (= total - len(hist))
+    rate      - samples/sec the producer emits (e.g. 5.0)
+    dt        - elapsed seconds since last call
+    lag       - jitter-buffer depth in samples (e.g. 4)
+
+    Returns the new play_pos (float).
+    """
+    play_pos = play_pos + rate * dt
+    if play_pos > newest:                 # caught up / data late -> hold at newest
+        play_pos = newest
+    if newest - play_pos > 2 * lag:       # fell too far behind (after a stall) -> snap
+        play_pos = newest - lag
+    floor = hist_base + 31                # need a full 32-wide window
+    if play_pos < floor:
+        play_pos = floor
+    return play_pos
+
 def draw_text_outline(x, y, s, color):
     """Draw text s at (x, y) with a 1px black outline for readability.
 
@@ -237,33 +261,54 @@ def draw_text_outline(x, y, s, color):
 # ---- poll data storage ------------------------------------------------------
 _data = {'wans': [], 'conns': None, 'stale': True}
 
-# Per-iface scroll state for smooth left-scroll animation.
-# shown_pings[iface] = the 32-wide window of pings currently being scrolled across
-# combined[iface]    = shown_pings (pre-scroll) + new SCROLL_N samples (length 32+SCROLL_N)
-# last_poll_ms       = time.ticks_ms() at the moment of the last successful poll
-shown_pings = {}
-combined = {}
+# Per-iface jitter-buffer state (dicts keyed by iface string):
+#   hist[iface]     - list of samples oldest→newest, max HIST_MAX entries
+#   total[iface]    - count of samples ever appended (absolute index of next sample)
+#                     so hist[j] has absolute index  total - len(hist) + j
+#   cgi_seq[iface]  - last seen wan['seq'] from the CGI (or None)
+#   play_pos[iface] - float absolute index of the rightmost DISPLAYED sample
+# last_frame_ms     - ticks_ms() at the last rendered frame (for dt computation)
+# last_poll_ms      - kept for compat (not used by scroll any more)
+hist = {}
+total = {}
+cgi_seq = {}
+play_pos = {}
+last_frame_ms = 0
 last_poll_ms = 0
 
 def poll():
     """Fetch /cgi-bin/traffic and update _data. On any error: keep last-good, set stale."""
-    global _data, shown_pings, combined, last_poll_ms
+    global _data, hist, total, cgi_seq, play_pos, last_poll_ms
     try:
         r = requests.get(cfg['base_url'] + '/cgi-bin/traffic')
         d = r.json(); r.close()
         new_wans = d.get('wans', [])
-        # Build scroll buffers before overwriting
         for wan in new_wans:
             iface = wan['iface']
             newer = wan.get('pings', [])
-            if iface in shown_pings:
-                # Append the SCROLL_N newest samples to the right of the shown window
-                combined[iface] = list(shown_pings[iface]) + list(newer[-SCROLL_N:])
-                shown_pings[iface] = newer
+            s = wan.get('seq')
+            if iface not in hist:
+                # First poll for this iface: seed the buffer
+                hist[iface] = list(newer)
+                total[iface] = s if s is not None else len(newer)
+                cgi_seq[iface] = s
+                lag = cfg['ping_lag']
+                play_pos[iface] = float(total[iface] - 1 - lag)
             else:
-                # First poll: no scroll yet, show the current pings directly
-                shown_pings[iface] = newer
-                combined[iface] = newer
+                # Subsequent polls: determine how many new samples arrived
+                if s is not None and cgi_seq[iface] is not None:
+                    n_new = s - cgi_seq[iface]
+                else:
+                    n_new = int(round(cfg['ping_rate'] * cfg['poll_seconds']))
+                # Clamp to valid range
+                if n_new < 0: n_new = 0
+                if n_new > len(newer): n_new = len(newer)
+                if n_new > 0:
+                    hist[iface].extend(newer[-n_new:])
+                    total[iface] += n_new
+                    if len(hist[iface]) > HIST_MAX:
+                        del hist[iface][:len(hist[iface]) - HIST_MAX]
+                cgi_seq[iface] = s
         last_poll_ms = time.ticks_ms()
         _data['wans'] = new_wans
         _data['conns'] = d.get('conns', None)
@@ -334,7 +379,7 @@ def draw_screen(s):
         draw_text(9, 0, str(s['conns']), PURPLE)
         return
     if k == 'ping':
-        # full-width sparkline: 32 columns, smooth left-scroll animation
+        # full-width sparkline: 32 columns, jitter-buffer constant-rate scroll
         pings = s['pings']
         n = len(pings)
         if n == 0:
@@ -343,32 +388,52 @@ def draw_screen(s):
             return
         iface = s.get('iface', '')
         scale = cfg['ping_scale_ms']
-        # Determine the combined buffer and scroll offset
-        if cfg.get('ping_animate') and iface in combined:
+        if cfg.get('ping_animate') and iface in hist:
+            global last_frame_ms
             now = time.ticks_ms()
-            t = time.ticks_diff(now, last_poll_ms) / float(POLL_MS)
-            if t < 0.0: t = 0.0
-            if t > 1.0: t = 1.0
-            f = t * SCROLL_N
-            buf = combined[iface]
+            if last_frame_ms == 0: last_frame_ms = now
+            dt = time.ticks_diff(now, last_frame_ms) / 1000.0
+            if dt > 0.3: dt = 0.3     # avoid a jump after the screen was off
+            last_frame_ms = now
+            newest = total[iface] - 1
+            hist_base = total[iface] - len(hist[iface])
+            play_pos[iface] = advance_play(
+                play_pos[iface], newest, hist_base,
+                cfg['ping_rate'], dt, cfg['ping_lag'])
+            buf = hist[iface]
+            pp = play_pos[iface]
+            # Render 32 columns: column c maps to absolute index pp-(31-c)
+            for c in range(W):
+                abs_idx = pp - (31 - c)
+                fidx = abs_idx - hist_base
+                v = scroll_sample(buf, fidx)
+                if v < 0:
+                    c_color = PURPLE
+                    if not blink_on: c_color = (0, 0, 0)
+                    px(c, 0, c_color)
+                else:
+                    level = round(min(v, scale) / scale * 6)
+                    row = 7 - max(0, min(6, level))
+                    color = GREEN if v < 40 else (AMBER if v < 80 else RED)
+                    px(c, row, color)
         else:
-            # Static: show the combined buffer at f=0 (leftmost window)
-            f = 0.0
-            buf = combined[iface] if iface in combined else pings
-        # Render 32 columns using fractional-index sampling
-        for c in range(W):
-            v = scroll_sample(buf, c + f)
-            if v < 0:
-                # Loss: purple dot at row 0
-                c_color = PURPLE
-                if not blink_on:
-                    c_color = (0, 0, 0)
-                px(c, 0, c_color)
-            else:
-                level = round(min(v, scale) / scale * 6)
-                row = 7 - max(0, min(6, level))
-                color = GREEN if v < 40 else (AMBER if v < 80 else RED)
-                px(c, row, color)
+            # Static path: draw the last 32 of hist (or raw pings) at integer positions
+            buf = hist[iface] if iface in hist else pings
+            start = max(0, len(buf) - W)
+            for c in range(W):
+                idx = start + c
+                if idx >= len(buf):
+                    break
+                v = buf[idx]
+                if v < 0:
+                    c_color = PURPLE
+                    if not blink_on: c_color = (0, 0, 0)
+                    px(c, 0, c_color)
+                else:
+                    level = round(min(v, scale) / scale * 6)
+                    row = 7 - max(0, min(6, level))
+                    color = GREEN if v < 40 else (AMBER if v < 80 else RED)
+                    px(c, row, color)
         # avg overlay always uses real current pings
         a = avg_ping(pings)
         lbl = avg_label(a)
