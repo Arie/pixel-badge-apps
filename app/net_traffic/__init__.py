@@ -126,8 +126,11 @@ def build_screens(wans, conns):
         screens.append({'id': '%s:up' % iface, 'kind': 'up', 'iface': iface,
                         'bps': wan['up_bps'], 'bps_max': wan['up_max'],
                         'prefix': prefix, 'wan': wan})
-        screens.append({'id': '%s:total' % iface, 'kind': 'total', 'iface': iface,
-                        'total': wan['total_down'],
+        screens.append({'id': '%s:total_down' % iface, 'kind': 'total', 'iface': iface,
+                        'total': wan['total_down'], 'dir': 'down',
+                        'prefix': prefix, 'wan': wan})
+        screens.append({'id': '%s:total_up' % iface, 'kind': 'total', 'iface': iface,
+                        'total': wan['total_up'], 'dir': 'up',
                         'prefix': prefix, 'wan': wan})
         screens.append({'id': '%s:ping' % iface, 'kind': 'ping', 'iface': iface,
                         'pings': wan.get('pings', []),
@@ -369,25 +372,25 @@ def draw_screen(s):
         draw_text(0, 4, '---' if s.get('stale') else 'WAIT', GREY)
         return
     if k == 'down':
-        draw_icon(0, 0, ICONS['DOWN'], GREEN)
+        draw_icon(0, 0, ICONS['DOWN'], RED)
+        px_off = 9
+        txt = fmt_rate(s['bps'])
+        draw_text(px_off, 0, txt, RED)
+        if s['bps_max'] > 0:
+            bar_left(7, s['bps'] / s['bps_max'], RED)
+        return
+    if k == 'up':
+        draw_icon(0, 0, ICONS['UP'], GREEN)
         px_off = 9
         txt = fmt_rate(s['bps'])
         draw_text(px_off, 0, txt, GREEN)
         if s['bps_max'] > 0:
             bar_left(7, s['bps'] / s['bps_max'], GREEN)
         return
-    if k == 'up':
-        draw_icon(0, 0, ICONS['UP'], BLUE)
-        px_off = 9
-        txt = fmt_rate(s['bps'])
-        draw_text(px_off, 0, txt, BLUE)
-        if s['bps_max'] > 0:
-            bar_left(7, s['bps'] / s['bps_max'], BLUE)
-        return
     if k == 'total':
-        draw_icon(0, 0, ICONS['SIGMA'], GREY)
-        txt = fmt_bytes(s['total'])
-        draw_text(9, 0, txt, GREY)
+        col = RED if s.get('dir') == 'down' else GREEN   # match the rate colours
+        draw_icon(0, 0, ICONS['SIGMA'], col)
+        draw_text(9, 0, fmt_bytes(s['total']), col)
         return
     if k == 'conns':
         draw_icon(0, 0, ICONS['CONNS'], PURPLE)

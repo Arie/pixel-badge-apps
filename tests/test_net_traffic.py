@@ -85,25 +85,33 @@ WAN2 = {
 
 def test_build_screens_single_wan_no_conns(net_app):
     screens = net_app.build_screens([WAN1], None)
-    assert len(screens) == 4
+    assert len(screens) == 5
     kinds = [s["kind"] for s in screens]
-    assert kinds == ["down", "up", "total", "ping"]
+    assert kinds == ["down", "up", "total", "total", "ping"]
+
+
+def test_build_screens_total_dirs(net_app):
+    screens = net_app.build_screens([WAN1], None)
+    totals = [s for s in screens if s["kind"] == "total"]
+    assert [t["dir"] for t in totals] == ["down", "up"]
+    assert totals[0]["total"] == WAN1["total_down"]
+    assert totals[1]["total"] == WAN1["total_up"]
 
 
 def test_build_screens_single_wan_with_conns(net_app):
     screens = net_app.build_screens([WAN1], 1240)
-    assert len(screens) == 5
+    assert len(screens) == 6
     assert screens[-1]["kind"] == "conns"
 
 
 def test_build_screens_multi_wan(net_app):
     screens = net_app.build_screens([WAN1, WAN2], None)
-    assert len(screens) == 8  # 4 + 4
+    assert len(screens) == 10  # 5 + 5
 
 
 def test_build_screens_multi_wan_with_conns(net_app):
     screens = net_app.build_screens([WAN1, WAN2], 300)
-    assert len(screens) == 9  # 4 + 4 + 1
+    assert len(screens) == 11  # 5 + 5 + 1
 
 
 def test_build_screens_stable_ids(net_app):
@@ -112,7 +120,8 @@ def test_build_screens_stable_ids(net_app):
     assert ids == [
         "pppoe-ppp0:down",
         "pppoe-ppp0:up",
-        "pppoe-ppp0:total",
+        "pppoe-ppp0:total_down",
+        "pppoe-ppp0:total_up",
         "pppoe-ppp0:ping",
     ]
 
