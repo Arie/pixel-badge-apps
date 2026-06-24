@@ -9,6 +9,8 @@
   "solar_max_w": 6000,
   "solar_entity": "sensor.your_solar_ac_power",
   "grid_entity": "sensor.your_p1_power",
+  "ev_entity": "sensor.your_ev_charger_power",
+  "ev_max_w": 11000,
   "batteries": [
     {"label": "HW1", "soc": "sensor.battery_1_soc", "power": "sensor.battery_1_power", "power_max": 800, "weight": 1, "soc_min": 0},
     {"label": "HW2", "soc": "sensor.battery_2_soc", "power": "sensor.battery_2_power", "power_max": 800, "weight": 1, "soc_min": 0},

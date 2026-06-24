@@ -29,6 +29,8 @@ DEFAULTS = {
     'solar_max_w': 6000,          # SOL max, USE-bar scale, GRID export full-scale
     'solar_entity': 'sensor.solaredge_se6k_ac_power',
     'grid_entity': 'sensor.homewizard_p1_vermogen',
+    'ev_entity': 'sensor.peblar_ev_charger_power',   # EV charger power (W); shown only when active
+    'ev_max_w': 11000,                                # 3x16A
     'batteries': [
         {'label': 'HW1', 'soc': 'sensor.plug_in_battery_state_of_charge',   'power': 'sensor.plug_in_battery_power',   'power_max': 800,  'weight': 1, 'soc_min': 0},
         {'label': 'HW2', 'soc': 'sensor.plug_in_battery_state_of_charge_2', 'power': 'sensor.plug_in_battery_power_2', 'power_max': 800,  'weight': 1, 'soc_min': 0},
@@ -101,6 +103,12 @@ ICONS = {ch: _glyph(a) for ch, a in {
 .#####..
 ....##..
 ...##...""",
+'EV': """
+..####..
+.######.
+########
+########
+.#....#.""",
 }.items()}
 
 # ---- stats (built from config; DEFAULTS reproduce this install exactly) ------
@@ -121,6 +129,10 @@ def _build_stats(c):
      {'id':'SELF','label':'SELF','icon':'SELF','kind':'self',  'color':LBLUE, 'max':c['solar_max_w'], 'hideIdle':True},
      {'id':'GRID','label':'GRID','icon':'GRID','kind':'grid',  'maxPos':c['grid_connection_w'],'maxNeg':c['solar_max_w']},
     ]
+    if c.get('ev_entity'):                            # EV charger: a hide-when-idle load
+        flow.append({'id':'EV', 'label':'EV', 'icon':'EV', 'kind':'power',
+                     'color':PURPLE, 'max':c['ev_max_w'], 'hideIdle':True})
+        entities['EV'] = c['ev_entity']
     return flow + bats, entities, pids
 
 STATS, ENTITIES, BAT_POWER_IDS = _build_stats(cfg)

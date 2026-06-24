@@ -8,7 +8,7 @@ def by_id(app):
 
 
 def test_stats_order(app):
-    assert [s["id"] for s in app.STATS] == ["USE", "SOL", "SELF", "GRID", "HW1", "HW2", "ZEN"]
+    assert [s["id"] for s in app.STATS] == ["USE", "SOL", "SELF", "GRID", "EV", "HW1", "HW2", "ZEN"]
 
 
 def test_stat_kinds(app):
@@ -17,6 +17,7 @@ def test_stat_kinds(app):
         "SOL": "power",
         "SELF": "self",
         "GRID": "grid",
+        "EV": "power",
         "HW1": "battery",
         "HW2": "battery",
         "ZEN": "battery",

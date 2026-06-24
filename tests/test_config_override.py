@@ -63,5 +63,15 @@ def test_malformed_batteries_skipped(app):
 
 def test_no_batteries(app):
     stats, ents, pids = app._build_stats(cfg_with(app, batteries=[]))
-    assert [s["id"] for s in stats] == ["USE", "SOL", "SELF", "GRID"]
+    assert [s["id"] for s in stats] == ["USE", "SOL", "SELF", "GRID", "EV"]
     assert pids == []
+
+
+def test_ev_charger_optional(app):
+    # present by default (this install has a Peblar): hide-when-idle power stat, 11kW gauge
+    g = {s["id"]: s for s in app._build_stats(dict(app.DEFAULTS))[0]}
+    assert g["EV"]["kind"] == "power" and g["EV"]["max"] == 11000 and g["EV"]["hideIdle"]
+    # absent when no ev_entity configured
+    cfg = dict(app.DEFAULTS)
+    cfg["ev_entity"] = ""
+    assert "EV" not in [s["id"] for s in app._build_stats(cfg)[0]]
