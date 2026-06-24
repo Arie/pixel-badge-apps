@@ -24,7 +24,7 @@ try:
 except OSError:                                  # absent off-device; pure logic doesn't need it
     CFG = {}
 BASE = CFG.get('base_url', '')
-POLL_MS = int(CFG.get('poll_seconds', 10)) * 1000
+POLL_MS = int(CFG.get('poll_seconds', 5)) * 1000
 ENTITIES = CFG.get('entities', {})               # id -> HA entity_id
 HEADERS = {'Authorization': 'Bearer ' + CFG.get('token', '')}
 IDLE_W = 10                                       # |power| below this = idle
