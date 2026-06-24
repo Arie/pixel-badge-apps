@@ -1,12 +1,16 @@
 #!/bin/sh
-# traffic CGI — per-WAN internet throughput for the Pixel-badge net_traffic app.
-# Reads /proc/net/dev, computes down/up bit-rates from the delta since the last
-# call (state in /tmp), and emits JSON. POSIX sh (busybox ash) — no extra packages.
+# traffic CGI v2 — per-WAN internet throughput + ping latency for the Pixel-badge
+# net_traffic app. Reads /proc/net/dev, computes down/up bit-rates from the delta
+# since the last call (state in /tmp), and emits JSON. POSIX sh (busybox ash) — no
+# extra packages.
 #
 # WAN list comes from /etc/traffic.conf, one WAN per line:
 #     <iface> <name> <down_mbps> <up_mbps>
 # e.g.  pppoe-ppp0 WAN1 1000 1000
 # If the file is absent, the default-route interface is auto-detected as "WAN".
+#
+# Ping data is read from /tmp/traffic_ping_<iface> (written by traffic-pinger daemon).
+# Active connections added as top-level "conns" only when /proc/net/nf_conntrack exists.
 #
 # Install: copy to /www/cgi-bin/traffic (chmod +x); add that path to
 # /etc/sysupgrade.conf so it survives sysupgrade. Poll http://<router>/cgi-bin/traffic
@@ -21,6 +25,48 @@ wan_lines() {
         dev=$(ip route get 8.8.8.8 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -1)
         [ -n "$dev" ] && echo "$dev WAN 1000 1000"
     fi
+}
+
+# Read the ring-buffer for an iface and emit JSON array + derived stats to stdout
+# in the format: <pings_json> <rtt_ms> <loss_pct>
+# (space-separated on one line, with pings_json having no internal spaces — it's a
+#  compact JSON array)
+read_ping_stats() {
+    local iface="$1"
+    local ringfile="$STATE_DIR/traffic_ping_${iface}"
+    if [ ! -f "$ringfile" ]; then
+        echo "[] -1 0"
+        return
+    fi
+    local entries
+    entries=$(cat "$ringfile")
+    if [ -z "$entries" ]; then
+        echo "[] -1 0"
+        return
+    fi
+
+    # Build JSON array and compute rtt_ms / loss_pct in one awk pass.
+    echo "$entries" | awk '
+    {
+        n = split($0, a, " ")
+        total = n
+        lost = 0
+        last_rtt = -1
+        arr = "["
+        for (i = 1; i <= n; i++) {
+            v = a[i]
+            if (i > 1) arr = arr ","
+            arr = arr v
+            if (v == -1) {
+                lost++
+            } else {
+                last_rtt = v
+            }
+        }
+        arr = arr "]"
+        loss_pct = (total > 0) ? int(lost * 100 / total) : 0
+        print arr, last_rtt, loss_pct
+    }'
 }
 
 now=$(date +%s)
@@ -51,10 +97,23 @@ wan_lines | while read -r iface name dmax umax _rest; do
     fi
     echo "$now $rx $tx" > "$sf"
 
+    # Read ping stats from ring-buffer (written by traffic-pinger daemon).
+    ping_stats=$(read_ping_stats "$iface")
+    pings_json=$(echo "$ping_stats" | awk '{print $1}')
+    rtt_ms=$(echo "$ping_stats" | awk '{print $2}')
+    loss_pct=$(echo "$ping_stats" | awk '{print $3}')
+
     [ "$first" = 1 ] || printf ','
     first=0
-    printf '{"name":"%s","iface":"%s","up":%s,"down_bps":%s,"up_bps":%s,"down_max":%s,"up_max":%s,"total_down":%s,"total_up":%s}' \
-        "$name" "$iface" "$up" "$drx" "$dtx" "$((dmax*1000000))" "$((umax*1000000))" "$rx" "$tx"
+    printf '{"name":"%s","iface":"%s","up":%s,"down_bps":%s,"up_bps":%s,"down_max":%s,"up_max":%s,"total_down":%s,"total_up":%s,"pings":%s,"rtt_ms":%s,"loss_pct":%s}' \
+        "$name" "$iface" "$up" "$drx" "$dtx" "$((dmax*1000000))" "$((umax*1000000))" "$rx" "$tx" \
+        "$pings_json" "$rtt_ms" "$loss_pct"
 done
 
-printf ']}\n'
+# Top-level conns: only emit if /proc/net/nf_conntrack exists.
+if [ -f /proc/net/nf_conntrack ]; then
+    conns=$(wc -l < /proc/net/nf_conntrack)
+    printf '],"conns":%s}\n' "$conns"
+else
+    printf ']}\n'
+fi

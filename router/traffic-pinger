@@ -1,0 +1,72 @@
+#!/bin/sh
+# traffic-pinger — per-WAN latency ring-buffer daemon for the net_traffic CGI v2.
+# Runs as a persistent daemon (managed by procd). For each WAN interface defined in
+# /etc/traffic.conf (same format: <iface> <name> <down_mbps> <up_mbps>) it issues
+# "ping -I <iface> -c1 -W1 8.8.8.8" roughly every 0.2 s and keeps the last 32 RTT
+# samples (integers in ms; -1 = loss/timeout) in /tmp/traffic_ping_<iface> as a
+# single space-separated line, newest last.
+#
+# POSIX sh (busybox ash) — no extra packages needed.
+# Install: /usr/bin/traffic-pinger  (managed via /etc/init.d/traffic-pinger)
+
+CONF=/etc/traffic.conf
+TARGET=8.8.8.8
+HIST_LEN=32
+
+# Determine list of WAN ifaces from conf or auto-detect, space-separated.
+get_ifaces() {
+    if [ -f "$CONF" ]; then
+        grep -vE '^[[:space:]]*(#|$)' "$CONF" | awk '{print $1}' | tr '\n' ' '
+    else
+        ip route get "$TARGET" 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -1
+    fi
+}
+
+# Ping once on iface; echo RTT int (ms) or -1.
+ping_once() {
+    local iface="$1"
+    local out rtt
+    out=$(ping -I "$iface" -c1 -W1 "$TARGET" 2>/dev/null)
+    rtt=$(printf '%s\n' "$out" | sed -n 's/.*time=\([0-9]*\)[^0-9].*/\1/p' | head -1)
+    if [ -n "$rtt" ]; then
+        printf '%s' "$rtt"
+    else
+        printf '%s' "-1"
+    fi
+}
+
+# Append rtt to ring buffer for iface, keeping last HIST_LEN entries.
+update_ring() {
+    local iface="$1"
+    local rtt="$2"
+    local ringfile="/tmp/traffic_ping_${iface}"
+    local existing=""
+    [ -f "$ringfile" ] && existing=$(cat "$ringfile")
+
+    # Set positional params to current entries; shift to keep last (HIST_LEN-1).
+    # shellcheck disable=SC2086
+    set -- $existing
+    while [ "$#" -ge "$HIST_LEN" ]; do
+        shift
+    done
+    # Write updated ring (leading space from $* is harmless for consumers).
+    printf '%s\n' "$* $rtt" > "$ringfile"
+}
+
+# Main loop — runs forever, cycling through WANs.
+while true; do
+    ifaces=$(get_ifaces)
+    if [ -z "$ifaces" ]; then
+        sleep 1
+        continue
+    fi
+    # Iterate ifaces without a subshell (word-split the space-separated list).
+    # shellcheck disable=SC2086
+    for iface in $ifaces; do
+        rtt=$(ping_once "$iface")
+        update_ring "$iface" "$rtt"
+        # Successful pings are fast; aim ~0.2s between cycles.
+        # ping -W1 already gates on loss (takes ~1s). On success add no extra sleep
+        # (the ping RTT itself provides natural pacing for most links).
+    done
+done
