@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>EV charger icon variants</title>
+  <link rel="stylesheet" href="./sim.css">
+  <style>
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 28px; margin: 10px 0; max-width: 1000px; }
+    .tile .matrix { width: 320px; height: 80px; }
+    .tile .cap { font-size: 13px; color: #cfe3ff; margin-top: 6px; }
+    .tile .art { font: 11px/1.05 monospace; color: #5a6b7a; white-space: pre; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>EV charger icon — variants</h1>
+  <p class="subtitle">Each shown as it renders on the panel: icon + EV 10.70KW + gauge (~97% of 11kW). Pick by letter.</p>
+  <div class="grid" id="grid"></div>
+
+  <script src="./pixelfont.js"></script>
+  <script src="./matrix.js"></script>
+  <script>
+    const PF = window.PixelFont, M = window.Matrix;
+    const PURPLE = '#5518cc';
+    const ICONS = {
+      'A — current (dot wheels)':  ["..####..", ".######.", "########", "########", ".#....#."],
+      'B — current + round wheels':["..####..", ".######.", "########", "########", ".##..##."],
+      'C — sporty / sloped':       ["...###..", "..####..", ".#######", "########", ".##..##."],
+      'D — SUV w/ window':         [".####...", ".#..#...", ".######.", "########", ".##..##."],
+      'E — low coupe':             ["........", "..####..", ".######.", "########", ".##..##."],
+      'F — hatchback w/ window':   ["..####..", ".#....#.", "########", "########", ".##..##."],
+    };
+    const grid = document.getElementById('grid');
+    for (const [name, rows] of Object.entries(ICONS)) {
+      const wrap = document.createElement('div'); wrap.className = 'tile';
+      const mx = document.createElement('div'); mx.className = 'matrix';
+      const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = name;
+      const art = document.createElement('div'); art.className = 'art';
+      art.textContent = rows.join('\n').replace(/\./g, '·').replace(/#/g, '█');
+      wrap.appendChild(mx); wrap.appendChild(cap); wrap.appendChild(art); grid.appendChild(wrap);
+      const m = new M(mx), b = M.blank();
+      for (let r = 0; r < rows.length; r++)
+        for (let x = 0; x < rows[r].length; x++)
+          if (rows[r][x] === '#') PF.setPixel(b, x, r, PURPLE);
+      PF.drawText(b, 9, 0, '10.70KW', PURPLE);
+      const n = Math.round(10704 / 11000 * 32);
+      for (let i = 0; i < n; i++) PF.setPixel(b, i, 7, PURPLE);
+      m.paint(b);
+    }
+  </script>
+</body>
+</html>

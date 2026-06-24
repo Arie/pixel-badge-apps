@@ -105,10 +105,10 @@ ICONS = {ch: _glyph(a) for ch, a in {
 ...##...""",
 'EV': """
 ..####..
-.######.
+.#....#.
 ########
 ########
-.#....#.""",
+.##..##.""",
 }.items()}
 
 # ---- stats (built from config; DEFAULTS reproduce this install exactly) ------
