@@ -17,6 +17,7 @@ except ImportError:                              # host: the pure logic still im
 
 from pixelbadge.matrix import W, H, fb, fb_clear, px, fb_blit
 from pixelbadge.pixelfont import _glyph, FONT, ink_bounds, draw_text, text_width, draw_icon
+from pixelbadge.gauges import bar_left
 
 # ---- config ----------------------------------------------------------------
 # DEFAULTS are this install's values; config.json (gitignored) overrides them.
@@ -124,12 +125,6 @@ def _build_stats(c):
 STATS, ENTITIES, BAT_POWER_IDS = _build_stats(cfg)
 BATSUM = {'kind':'batsummary', 'id':'BAT'}
 VALUES = {}     # id -> float (raw HA readings)
-
-# ---- proportional font (imported from pixelbadge.pixelfont) -----------------
-def bar_left(y, frac, color):
-    n = int(min(1.0, frac) * W + 0.5)
-    for i in range(n):
-        px(i, y, color)
 
 # ---- values, colours, formatting --------------------------------------------
 def value_of(s):
