@@ -128,3 +128,23 @@ ssh root@192.168.1.1 'start-stop-daemon -K -p /tmp/pinger.pid; pkill -f "ping -I
 
 The badge polls `http://<router>/cgi-bin/traffic` (dev `192.168.1.1`, party
 `192.168.99.1`). Tested non-invasively from `/tmp` against `root@192.168.1.1`.
+
+## Dev data faker (`traffic-faker`)
+
+A flat real connection (e.g. a steady 4 ms) makes the ping graph dull to develop
+against. `traffic-faker` writes synthetic samples (baseline jitter + ~10% spikes +
+~4% loss) to the ring buffer the CGI reads, so the badge graph shows lively motion.
+**Dev only** — run it INSTEAD of the real pinger:
+
+```sh
+ssh root@192.168.1.1 'cat > /tmp/traffic-faker' < router/traffic-faker
+ssh root@192.168.1.1 'chmod +x /tmp/traffic-faker;
+  /etc/init.d/traffic-pinger stop; /etc/init.d/traffic-pinger disable;
+  start-stop-daemon -S -b -m -p /tmp/faker.pid -x /bin/sh -- /tmp/traffic-faker pppoe-ppp0'
+```
+
+To restore real pings: `pkill -f traffic-faker; /etc/init.d/traffic-pinger enable; /etc/init.d/traffic-pinger start`.
+
+> NOTE (current dev state of `192.168.1.1`): the real pinger is **stopped + disabled**
+> and the faker is running from `/tmp` (lost on router reboot). Re-enable the pinger
+> when done developing the graph.
