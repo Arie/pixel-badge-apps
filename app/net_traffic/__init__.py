@@ -404,21 +404,10 @@ def draw_screen(s):
         iface = s.get('iface', '')
         scale = cfg['ping_scale_ms']
         if cfg.get('ping_animate') and iface in hist:
-            global last_frame_ms
-            now = time.ticks_ms()
-            if last_frame_ms == 0: last_frame_ms = now
-            dt = time.ticks_diff(now, last_frame_ms) / 1000.0
-            if dt > 0.3: dt = 0.3     # avoid a jump after the screen was off
-            last_frame_ms = now
-            newest = total[iface] - 1
-            hist_base = total[iface] - len(hist[iface])
-            play_pos[iface] = advance_play(
-                play_pos[iface], newest, hist_base,
-                cfg['ping_rate'], dt, cfg['ping_lag'])
+            # play_pos is advanced in Display._advance_ping; here we just read it.
+            # Snap the window to integer sample positions: exact bars, no morph.
             buf = hist[iface]
-            # Snap the window to integer sample positions: exact bars, no height
-            # interpolation -> no morph/duplication. The bars step one column at a
-            # time as play_pos crosses integers (~data rate), driven smoothly.
+            hist_base = total[iface] - len(hist[iface])
             ipp = int(round(play_pos[iface]))
             for c in range(W):
                 idx = ipp - (31 - c) - hist_base
@@ -500,6 +489,7 @@ class Display:
         self.last_poll = self.last_adv = self.touched = time.ticks_ms()
         self.dirty = True
         self.alerting = False
+        self.last_ipp = -1          # last integer scroll position rendered (dirty-gate)
 
     def _brightness(self, now):
         if state['bright'] != self.bright:
@@ -540,14 +530,39 @@ class Display:
         s = self.car.current()
         return s.get('kind') == 'ping'
 
+    def _advance_ping(self, now):
+        """Advance the ping play-head every tick; return its integer scroll position
+        (or None if no data). Decoupled from rendering so we can redraw only when the
+        integer position changes (nearest-sample bars are identical between steps)."""
+        global last_frame_ms
+        iface = self.car.current().get('iface', '')
+        if iface not in hist:
+            return None
+        if last_frame_ms == 0:
+            last_frame_ms = now
+        dt = time.ticks_diff(now, last_frame_ms) / 1000.0
+        if dt > 0.3:
+            dt = 0.3                 # avoid a jump after the screen was off
+        last_frame_ms = now
+        newest = total[iface] - 1
+        hist_base = total[iface] - len(hist[iface])
+        play_pos[iface] = advance_play(
+            play_pos[iface], newest, hist_base, cfg['ping_rate'], dt, cfg['ping_lag'])
+        return int(round(play_pos[iface]))
+
     def _draw(self, now):
-        # Ping-animate: bypass dirty gate; always render at ~14fps
+        # Ping screen: advance the play-head every tick but redraw (and blit, which
+        # blanks the panel via rgb.clear) ONLY when the integer scroll position
+        # changes -> ~5 redraws/sec instead of 14, killing the residual flicker.
         if cfg.get('ping_animate') and self._is_ping_screen():
-            try:
-                render(self.car.current())
-            except Exception as e:
-                sys.print_exception(e)
-            self.dirty = False
+            ipp = self._advance_ping(now)
+            if ipp != self.last_ipp or self.dirty:
+                try:
+                    render(self.car.current())
+                except Exception as e:
+                    sys.print_exception(e)
+                self.last_ipp = ipp
+                self.dirty = False
         elif self.dirty:
             try:
                 render(self.car.current())
