@@ -69,9 +69,18 @@ def test_no_batteries(app):
 
 def test_ev_charger_optional(app):
     # present by default (this install has a Peblar): hide-when-idle power stat, 11kW gauge
-    g = {s["id"]: s for s in app._build_stats(dict(app.DEFAULTS))[0]}
+    stats, ents, _ = app._build_stats(dict(app.DEFAULTS))
+    g = {s["id"]: s for s in stats}
     assert g["EV"]["kind"] == "power" and g["EV"]["max"] == 11000 and g["EV"]["hideIdle"]
+    # vehicle SOC drives the gauge: EV carries socId -> EVSOC entity
+    assert g["EV"]["socId"] == "EVSOC"
+    assert ents["EVSOC"] == app.DEFAULTS["ev_soc_entity"]
     # absent when no ev_entity configured
     cfg = dict(app.DEFAULTS)
     cfg["ev_entity"] = ""
     assert "EV" not in [s["id"] for s in app._build_stats(cfg)[0]]
+    # no SOC gauge when ev_soc_entity is unset -> falls back to the power gauge
+    cfg2 = dict(app.DEFAULTS)
+    cfg2["ev_soc_entity"] = ""
+    g2 = {s["id"]: s for s in app._build_stats(cfg2)[0]}
+    assert "socId" not in g2["EV"]

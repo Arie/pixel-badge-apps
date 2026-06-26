@@ -31,6 +31,7 @@ DEFAULTS = {
     'grid_entity': 'sensor.homewizard_p1_vermogen',
     'ev_entity': 'sensor.peblar_ev_charger_power',   # EV charger power (W); shown only when active
     'ev_max_w': 11000,                                # 3x16A
+    'ev_soc_entity': 'sensor.z003fz_battery',         # vehicle SOC (%) -> drawn in the gauge
     'batteries': [
         {'label': 'HW1', 'soc': 'sensor.plug_in_battery_state_of_charge',   'power': 'sensor.plug_in_battery_power',   'power_max': 800,  'weight': 1, 'soc_min': 0},
         {'label': 'HW2', 'soc': 'sensor.plug_in_battery_state_of_charge_2', 'power': 'sensor.plug_in_battery_power_2', 'power_max': 800,  'weight': 1, 'soc_min': 0},
@@ -130,9 +131,13 @@ def _build_stats(c):
      {'id':'GRID','label':'GRID','icon':'GRID','kind':'grid',  'maxPos':c['grid_connection_w'],'maxNeg':c['solar_max_w']},
     ]
     if c.get('ev_entity'):                            # EV charger: a hide-when-idle load
-        flow.append({'id':'EV', 'label':'EV', 'icon':'EV', 'kind':'power',
-                     'color':PURPLE, 'max':c['ev_max_w'], 'hideIdle':True})
+        ev = {'id':'EV', 'label':'EV', 'icon':'EV', 'kind':'power',
+              'color':PURPLE, 'max':c['ev_max_w'], 'hideIdle':True}
         entities['EV'] = c['ev_entity']
+        if c.get('ev_soc_entity'):                    # gauge shows vehicle SOC, not charge power
+            ev['socId'] = 'EVSOC'
+            entities['EVSOC'] = c['ev_soc_entity']
+        flow.append(ev)
     return flow + bats, entities, pids
 
 STATS, ENTITIES, BAT_POWER_IDS = _build_stats(cfg)
@@ -257,6 +262,8 @@ def draw_stat(s):
     draw_text(9, 0, fit_value(fmt(s, v), W - 9), col)
     if k == 'use':
         draw_use_bar(v)         # two-tone: green self-use / purple import / amber export
+    elif s.get('socId'):        # EV: gauge fills to the vehicle SOC, not charge power
+        bar_left(7, min(1.0, VALUES.get(s['socId'], 0) / 100.0), col)
     else:
         gauge(s, v, col)
 
