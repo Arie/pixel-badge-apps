@@ -66,3 +66,9 @@ def test_bar_overflow_blinks_full_alert(app):
     lit = [c for c in _row7(app) if c]
     assert len(lit) == app.W
     assert all(c == _pack(app.ALERT) for c in lit)
+
+
+def test_use_bar_ends_self_import_export(app):
+    # extracted pure boundary math: USE_SCALE=6000, W=32
+    assert app.use_bar_ends(4500, 3000) == (16, 24, 16)  # import case (solar<usage)
+    assert app.use_bar_ends(3000, 4500) == (16, 16, 24)  # export case (solar>usage)

@@ -50,3 +50,17 @@ def test_overflow_draws_nothing_on_blink_off(app):
     app.blink_on = False
     app.gauge({"kind": "power", "max": 1000}, 2000, app.GREEN)
     assert not any(_row7(app))
+
+
+# ---- applicable_max (extracted, shared by gauge + is_overflow) ---------------
+
+
+def test_applicable_max_grid_scales_by_sign(app):
+    s = {"kind": "grid", "maxPos": 17250, "maxNeg": 6000}
+    assert app.applicable_max(s, -1) == 6000  # export
+    assert app.applicable_max(s, 1) == 17250  # import
+    assert app.applicable_max(s, 0) == 17250  # zero -> import side
+
+
+def test_applicable_max_nongrid_is_plain_max(app):
+    assert app.applicable_max({"kind": "power", "max": 1000}, -500) == 1000

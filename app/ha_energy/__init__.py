@@ -204,13 +204,14 @@ def fit_value(txt, avail):
         txt = txt[:i + 2] + txt[i + 3:]
     return txt
 
+def applicable_max(s, v):           # gauge full-scale; grid scales by sign of v
+    if s['kind'] == 'grid':
+        return s['maxNeg'] if v < 0 else s['maxPos']
+    return s['max']
+
 blink_on = True
 def gauge(s, v, col):
-    if s['kind'] == 'grid':
-        mx = s['maxNeg'] if v < 0 else s['maxPos']
-    else:
-        mx = s['max']
-    frac = abs(v) / mx
+    frac = abs(v) / applicable_max(s, v)
     if frac > 1:
         if blink_on:
             bar_left(7, 1.0, ALERT)
@@ -223,16 +224,18 @@ def use_segments(usage, solar):
     self_w = solar if solar < usage else usage
     return (self_w, usage - self_w, solar - self_w)
 
+def use_bar_ends(usage, solar):                 # row-7 pixel ends: green|purple|amber
+    self_w = use_segments(usage, solar)[0]
+    return (int(min(1.0, self_w / USE_SCALE) * W + 0.5),    # solar used at home (green)
+            int(min(1.0, usage  / USE_SCALE) * W + 0.5),    # ...then grid import (purple)
+            int(min(1.0, solar  / USE_SCALE) * W + 0.5))    # ...or solar export (amber)
+
 def draw_use_bar(usage):
     if usage > GRID_MAX:                        # boost beyond the grid connection
         if blink_on:
             bar_left(7, 1.0, ALERT)
         return
-    solar = VALUES.get('SOL', 0)
-    self_w, _imp, _exp = use_segments(usage, solar)
-    end_self = int(min(1.0, self_w / USE_SCALE) * W + 0.5)   # solar used at home (green)
-    end_imp  = int(min(1.0, usage  / USE_SCALE) * W + 0.5)   # ...then grid import (purple)
-    end_exp  = int(min(1.0, solar  / USE_SCALE) * W + 0.5)   # ...or solar export (amber)
+    end_self, end_imp, end_exp = use_bar_ends(usage, VALUES.get('SOL', 0))
     for i in range(end_self):
         px(i, 7, GREEN)
     for i in range(end_self, end_imp):
@@ -285,12 +288,16 @@ def active_stats():
     return out
 
 # ---- HA polling -------------------------------------------------------------
+def fetch_value(entity):                  # one HA reading as float; caller guards failures
+    r = requests.get(BASE + '/api/states/' + entity, headers=HEADERS)
+    try:
+        return float(r.json()['state'])
+    finally:
+        r.close()
 def poll():
     for sid in ENTITIES:
         try:
-            r = requests.get(BASE + '/api/states/' + ENTITIES[sid], headers=HEADERS)
-            d = r.json(); r.close()
-            VALUES[sid] = float(d['state'])
+            VALUES[sid] = fetch_value(ENTITIES[sid])
         except Exception:
             pass
     gc.collect()
@@ -306,12 +313,12 @@ def cb_right(d):
     if d:
         state['nav'] = 1
         state['paused'] = True
+def _bright_step(delta):
+    state['bright'] = min(30, max(1, state['bright'] + delta))   # 1..30
 def cb_up(d):
-    if d:
-        state['bright'] = min(30, state['bright'] + 2)
+    if d: _bright_step(2)
 def cb_down(d):
-    if d:
-        state['bright'] = max(1, state['bright'] - 2)
+    if d: _bright_step(-2)
 def cb_a(d):
     if d:
         state['paused'] = not state['paused']   # toggle auto-rotate
@@ -332,12 +339,9 @@ def render(s):
     fb_blit()
 
 def is_overflow(s):                       # does this stat blink (value over its max)?
-    k = s['kind']
-    if k == 'grid':
+    if s['kind'] in ('grid', 'use', 'self', 'power'):
         v = value_of(s)
-        return abs(v) > (s['maxNeg'] if v < 0 else s['maxPos'])
-    if k == 'use' or k == 'self' or k == 'power':
-        return abs(value_of(s)) > s['max']
+        return abs(v) > applicable_max(s, v)
     return False
 
 # ---- main -------------------------------------------------------------------
