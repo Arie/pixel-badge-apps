@@ -19,6 +19,7 @@ from pixelbadge.matrix import W, H, fb, fb_clear, px, fb_blit
 from pixelbadge.pixelfont import _glyph, FONT, ink_bounds, draw_text, text_width, draw_icon
 from pixelbadge.gauges import bar_left
 from pixelbadge.carousel import Carousel
+from pixelbadge.boot import connect_wifi
 
 # ---- config ----------------------------------------------------------------
 # DEFAULTS are this install's values; config.json (gitignored) overrides them.
@@ -403,8 +404,7 @@ class Display:
 def main():
     rgb.background((0, 0, 0))
     rgb.brightness(state['bright'])
-    if not wifi.status():
-        wifi.connect(); wifi.wait()
+    connect_wifi(wifi)                                 # animated wifi indicator until up
     if wifi.status():
         poll()
     display = Display()
